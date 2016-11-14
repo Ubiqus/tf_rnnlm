@@ -90,19 +90,19 @@ def data_type():
   return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
-class PTBInput(object):
+class Input(object):
   """The input data."""
 
   def __init__(self, config, data, name=None):
     self.batch_size = batch_size = config.batch_size
     self.num_steps = num_steps = config.num_steps
     self.epoch_size = ((len(data) // batch_size) - 1) // num_steps
-    self.input_data, self.targets = reader.ptb_producer(
+    self.input_data, self.targets = reader.producer(
         data, batch_size, num_steps, name=name)
 
 
-class PTBModel(object):
-  """The PTB model."""
+class Model(object):
+  """The model."""
 
   def __init__(self, is_training, config, input_):
     self._input = input_
@@ -305,7 +305,7 @@ import os
 import pickle
 def main(_):
   if not FLAGS.data_path:
-    raise ValueError("Must set --data_path to PTB data directory")
+    raise ValueError("Must set --data_path to data directory")
 
   assert(FLAGS.action in ACTIONS)
   action = FLAGS.action
@@ -333,7 +333,7 @@ def main(_):
   print(config.vocab_size)
 
   # Load data
-  raw_data = reader.ptb_raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
+  raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
   train_data, valid_data, test_data, word_to_id = raw_data
 
   with tf.Graph().as_default():
@@ -347,22 +347,22 @@ def main(_):
         pickle.dump(word_to_id, f)
 
       with tf.name_scope("Train"):
-        train_input = PTBInput(config=config, data=train_data, name="TrainInput")
+        train_input = Input(config=config, data=train_data, name="TrainInput")
         with tf.variable_scope("Model", reuse=False, initializer=initializer):
-          m = PTBModel(is_training=True, config=config, input_=train_input)
+          m = Model(is_training=True, config=config, input_=train_input)
         tf.scalar_summary("Training Loss", m.cost)
         tf.scalar_summary("Learning Rate", m.lr)
       
       with tf.name_scope("Valid"):
-        valid_input = PTBInput(config=config, data=valid_data, name="ValidInput")
+        valid_input = Input(config=config, data=valid_data, name="ValidInput")
         with tf.variable_scope("Model", reuse=True, initializer=initializer):
-          mvalid = PTBModel(is_training=False, config=config, input_=valid_input)
+          mvalid = Model(is_training=False, config=config, input_=valid_input)
         tf.scalar_summary("Validation Loss", mvalid.cost)
     
     with tf.name_scope("Test"):
-      test_input = PTBInput(config=eval_config, data=test_data, name="TestInput")
+      test_input = Input(config=eval_config, data=test_data, name="TestInput")
       with tf.variable_scope("Model", reuse=train, initializer=initializer):
-        mtest = PTBModel(is_training=False, config=eval_config,
+        mtest = Model(is_training=False, config=eval_config,
                          input_=test_input)
 
     

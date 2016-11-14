@@ -14,7 +14,7 @@
 # ==============================================================================
 
 
-"""Utilities for parsing PTB text files."""
+"""Utilities for parsing text files."""
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -47,10 +47,10 @@ def _file_to_word_ids(filename, word_to_id):
   return [word_to_id[word] for word in data if word in word_to_id]
 
 
-def ptb_raw_data(data_path=None, training=True, word_to_id=None):
-  """Load PTB raw data from data directory "data_path".
+def raw_data(data_path=None, training=True, word_to_id=None):
+  """Load raw data from data directory "data_path".
 
-  Reads PTB text files, converts strings to integer ids,
+  Reads text files, converts strings to integer ids,
   and performs mini-batching of the inputs.
 
   The PTB dataset comes from Tomas Mikolov's webpage:
@@ -63,13 +63,13 @@ def ptb_raw_data(data_path=None, training=True, word_to_id=None):
 
   Returns:
     tuple (train_data, valid_data, test_data, vocabulary)
-    where each of the data objects can be passed to PTBIterator.
+    where each of the data objects can be passed to producer.
   """
   train_data, valid_data, test_data = None, None, None
   if training:
-    train_path = os.path.join(data_path, "ptb.train.txt")
-    valid_path = os.path.join(data_path, "ptb.valid.txt")
-    test_path = os.path.join(data_path, "ptb.test.txt")
+    train_path = os.path.join(data_path, "train.txt")
+    valid_path = os.path.join(data_path, "valid.txt")
+    test_path = os.path.join(data_path, "test.txt")
 
     if word_to_id is None:
       word_to_id = _build_vocab(train_path)
@@ -80,7 +80,7 @@ def ptb_raw_data(data_path=None, training=True, word_to_id=None):
   else:
     if not word_to_id:
       raise ValueError("Must set 'word_to_id' when action is not 'train'")
-    test_path = os.path.join(data_path, "ptb.test.txt")
+    test_path = os.path.join(data_path, "test.txt")
     test_data = _file_to_word_ids(test_path, word_to_id)
     
 
@@ -88,14 +88,14 @@ def ptb_raw_data(data_path=None, training=True, word_to_id=None):
   return train_data, valid_data, test_data, word_to_id
 
 
-def ptb_producer(raw_data, batch_size, num_steps, name=None):
-  """Iterate on the raw PTB data.
+def producer(raw_data, batch_size, num_steps, name=None):
+  """Iterate on the raw data.
 
   This chunks up raw_data into batches of examples and returns Tensors that
   are drawn from these batches.
 
   Args:
-    raw_data: one of the raw data outputs from ptb_raw_data.
+    raw_data: one of the raw data outputs from raw_data.
     batch_size: int, the batch size.
     num_steps: int, the number of unrolls.
     name: the name of this operation (optional).
@@ -107,7 +107,7 @@ def ptb_producer(raw_data, batch_size, num_steps, name=None):
   Raises:
     tf.errors.InvalidArgumentError: if batch_size or num_steps are too high.
   """
-  with tf.name_scope(name, "PTBProducer", [raw_data, batch_size, num_steps]):
+  with tf.name_scope(name, "Producer", [raw_data, batch_size, num_steps]):
     raw_data = tf.convert_to_tensor(raw_data, name="raw_data", dtype=tf.int32)
 
     data_len = tf.size(raw_data)
