@@ -47,7 +47,7 @@ def _file_to_word_ids(filename, word_to_id):
   return [word_to_id[word] for word in data if word in word_to_id]
 
 
-def ptb_raw_data(data_path=None, action="train", word_to_id=None):
+def ptb_raw_data(data_path=None, training=True, word_to_id=None):
   """Load PTB raw data from data directory "data_path".
 
   Reads PTB text files, converts strings to integer ids,
@@ -66,12 +66,13 @@ def ptb_raw_data(data_path=None, action="train", word_to_id=None):
     where each of the data objects can be passed to PTBIterator.
   """
   train_data, valid_data, test_data = None, None, None
-  if action == "train":
+  if training:
     train_path = os.path.join(data_path, "ptb.train.txt")
     valid_path = os.path.join(data_path, "ptb.valid.txt")
     test_path = os.path.join(data_path, "ptb.test.txt")
 
-    word_to_id = _build_vocab(train_path)
+    if word_to_id is None:
+      word_to_id = _build_vocab(train_path)
     train_data = _file_to_word_ids(train_path, word_to_id)
     valid_data = _file_to_word_ids(valid_path, word_to_id)
     test_data = _file_to_word_ids(test_path, word_to_id)

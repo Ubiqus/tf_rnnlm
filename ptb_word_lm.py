@@ -76,12 +76,10 @@ logging = tf.logging
 flags.DEFINE_string("model_dir", "model", "model_dir (containing ckpt files and word_to_id)")
 flags.DEFINE_string("action", "test", "should we train or test. Possible options are: %s" % ", ".join(ACTIONS))
 flags.DEFINE_string(
-    "model", "small",
-    "A type of model. Possible options are: small, medium, large.")
+    "config", None,
+    "A type of model. Possible options are: 'small', 'medium', 'large' or path to config file.")
 flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
-flags.DEFINE_string("save_path", None,
-                    "Model output directory.")
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
@@ -251,20 +249,22 @@ def run_epoch(session, model, eval_op=None, verbose=False, idict=None):
     #print(probs)
     #print(probs.shape)
     #print(targets)
-    n = model.config.num_steps - 1
-    probs = probs[n]
-    decoded_word_id = int(np.argmax(probs))
-    decoded_word_prob = probs[decoded_word_id]
-    decoded_word = idict[decoded_word_id]
+    
+    #n = model.config.num_steps - 1
+    #probs = probs[n]
+    #decoded_word_id = int(np.argmax(probs))
+    #decoded_word_prob = probs[decoded_word_id]
+    #decoded_word = idict[decoded_word_id]
 
-    input_word = " ".join([idict[int(x1)] for x1 in np.nditer(inputs)])
+    #input_word = " ".join([idict[int(x1)] for x1 in np.nditer(inputs)])
 
-    expected_word_id = targets[0][n]
-    expected_word = idict[expected_word_id]
-    expected_word_prob = probs[expected_word_id]
+    #expected_word_id = targets[0][n]
+    #expected_word = idict[expected_word_id]
+    #expected_word_prob = probs[expected_word_id]
 
 
-    prob_tot += np.log(expected_word_prob)
+    #prob_tot += np.log(expected_word_prob)
+    
     #print(logits.shape)
 
     #print(inputs)
@@ -285,17 +285,21 @@ def run_epoch(session, model, eval_op=None, verbose=False, idict=None):
   return np.exp(costs / iters)
 
 
+
+from config import Config
 def get_config():
-  if FLAGS.model == "small":
-    return SmallConfig()
-  elif FLAGS.model == "medium":
-    return MediumConfig()
-  elif FLAGS.model == "large":
-    return LargeConfig()
-  elif FLAGS.model == "test":
-    return TestConfig()
+  config_path = os.path.join(FLAGS.model_dir, "config")
+  return Config(model=FLAGS.config, path=config_path) 
+
+def _restore_session(saver, session):
+  ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)
+  print (ckpt)
+  if ckpt and ckpt.model_checkpoint_path:
+    saver.restore(session, ckpt.model_checkpoint_path)
+    return session
   else:
-    raise ValueError("Invalid model: %s", FLAGS.model)
+    raise ValueError("No checkpoint file found") 
+
 
 import os
 import pickle
@@ -305,32 +309,31 @@ def main(_):
 
   assert(FLAGS.action in ACTIONS)
   action = FLAGS.action
-  train = action == "train"
+  train = action in ["train", "continue"]
   print("Action: "+action)
 
-  # If not training, load vocabulary & configuration
-  config_path = os.path.join(FLAGS.model_dir, "config")  
+  config = get_config()
+
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if action in ["test", "top"]:
+  if action in ["test", "predict", "continue"]:
+    #TODO Exception
     print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
       word_to_id = pickle.load(f)
 
-    print("Loading config: "+config_path)
-    with open(config_path, 'r') as f:
-      config = pickle.load(f)
-
   else:
     word_to_id = None
-    config = get_config()
+    config.epoch = 0
  
   eval_config = config
   eval_config.batch_size = 1
   eval_config.num_steps = 1
 
- 
+
+  print(config.vocab_size)
+
   # Load data
-  raw_data = reader.ptb_raw_data(FLAGS.data_path, action=action, word_to_id=word_to_id)
+  raw_data = reader.ptb_raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
   train_data, valid_data, test_data, word_to_id = raw_data
 
   with tf.Graph().as_default():
@@ -342,12 +345,10 @@ def main(_):
       # Saving word_to_id & conf to file
       with open(word_to_id_path, 'w') as f:
         pickle.dump(word_to_id, f)
-      with open(config_path, 'w') as f:
-        pickle.dump(config, f)
 
       with tf.name_scope("Train"):
         train_input = PTBInput(config=config, data=train_data, name="TrainInput")
-        with tf.variable_scope("Model", reuse=None, initializer=initializer):
+        with tf.variable_scope("Model", reuse=False, initializer=initializer):
           m = PTBModel(is_training=True, config=config, input_=train_input)
         tf.scalar_summary("Training Loss", m.cost)
         tf.scalar_summary("Learning Rate", m.lr)
@@ -360,15 +361,17 @@ def main(_):
     
     with tf.name_scope("Test"):
       test_input = PTBInput(config=eval_config, data=test_data, name="TestInput")
-      with tf.variable_scope("Model", reuse=False, initializer=initializer):
+      with tf.variable_scope("Model", reuse=train, initializer=initializer):
         mtest = PTBModel(is_training=False, config=eval_config,
                          input_=test_input)
 
     
-    sv = tf.train.Supervisor(logdir=FLAGS.save_path)
+    sv = tf.train.Supervisor(logdir=FLAGS.model_dir)
     with sv.managed_session() as session:
       if train:
-        for i in range(config.max_max_epoch):
+        print("Starting training from epoch %d" % config.epoch)
+        while config.epoch < config.max_max_epoch:
+          i = config.epoch
           lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
           m.assign_lr(session, config.learning_rate * lr_decay)
 
@@ -379,25 +382,19 @@ def main(_):
           valid_perplexity = run_epoch(session, mvalid)
           print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
 
-        if FLAGS.save_path:
-          print("Saving model to %s." % FLAGS.save_path)
-          sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
+          config.epoch += 1
+          config.save()
+        
+        print("Saving model to %s." % FLAGS.model_dir)
+        sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
 
   
       else:
         inverse_dictionary = dict(zip(word_to_id.values(), word_to_id.keys()))	
-       
-        print ('testing')
-        ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)
-        print (ckpt)
-        if ckpt and ckpt.model_checkpoint_path:
-            sv.saver.restore(session, ckpt.model_checkpoint_path)
-            test_perplexity = run_epoch(session, mtest, idict=inverse_dictionary)
-            print("Test Perplexity: %.3f" % test_perplexity)
-
-        else:
-            print ("No checkpoint file found") 
-            
+        session = _restore_session(sv.saver, session)
+        test_perplexity = run_epoch(session, mtest, idict=inverse_dictionary)
+        print("Test Perplexity: %.3f" % test_perplexity)   
+                    
 if __name__ == "__main__":
   tf.app.run()
 
