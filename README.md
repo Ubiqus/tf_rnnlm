@@ -42,8 +42,10 @@ chmod +x gen_config.py
 # Edit whatever you want
 vi custom_model/config
 
-# Train it. (it will automatically look for 'config' file in the model directory as no --config is set.
-python word_lm.py --action train --data_path ./simple-examples/data --model_dir=./custom_model
+# Train it. (it will automatically look for 'config' file in the model directory as no --config is set).
+# It will look for 'train.txt', 'test.txt' and 'valid.txt' in --data_path
+# These files must be present.
+python word_lm.py --action train --data_path=./simple-examples/data --model_dir=./custom_model
 ```
 
 ## Results
