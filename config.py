@@ -3,28 +3,28 @@ import json
 class Config:
   """Configuration object loaded from/saved to JSON object
   """
-  def __init__(self, model=None, path=None):
+  def __init__(self, config=None, path=None):
     self.path = path
-    if model is not None:
-      entries = self._get_config(model)
+    if config is not None:
+      entries = self._get_config(config)
     elif path is not None:
       entries = self._load()
     else:
-      raise ValueError("Parameters 'model' and 'path' can't be both 'None'")
+      raise ValueError("Parameters 'config' and 'path' can't be both 'None'")
 
     self.__dict__.update(entries)
 
-  def _get_config(self, model):       
-    if model == "small":
+  def _get_config(self, config):       
+    if config == "small":
       o = small_config()
-    elif model == "medium":
+    elif config == "medium":
       o = medium_config()
-    elif model == "large":
+    elif config == "large":
       o = large_config()
-    elif model == "test":
+    elif config == "test":
       o = test_config()
     else:
-      raise ValueError("Invalid model: %s", model)
+      raise ValueError("Invalid config: %s", config)
     return o
 
   def _load(self):

@@ -289,7 +289,7 @@ def run_epoch(session, model, eval_op=None, verbose=False, idict=None):
 from config import Config
 def get_config():
   config_path = os.path.join(FLAGS.model_dir, "config")
-  return Config(model=FLAGS.config, path=config_path) 
+  return Config(config=FLAGS.config, path=config_path) 
 
 def _restore_session(saver, session):
   ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)
