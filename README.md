@@ -22,18 +22,18 @@ python word_lm.py --help
 
 **Note** that `word_lm.py` imports `reader.py` not `tensorflow.models.rnn.ptb` (i.e. it does not use your tensorflow installation). It is therefore compatible with tensorflow r0.11c as long as you don't use `word_lm.py` alone. 
 
-Downloading PTB dataset: 
+**Downloading PTB dataset:**
 ```
 chmod +x get_ptb.sh
 ./get_ptb.sh
 ```
 
-Training small model:
+**Training small model:**
 ```
 mkdir small_model
 python word_lm.py --action train --data_path ./simple-examples/data --model_dir=./small_model --config small
 ```
-Training custom model:
+**Training custom model:**
 ```
 mkdir custom_model
 
@@ -83,11 +83,6 @@ It will print a json object with the following structure:
   + prob: probability associated with the target, 
   + pred_word: predicted word
   + pred_prob: probability associated with the predicted word
-
-
-```
-
-Good language models will tend to minimize `| prob - pred_prob | `
 
 ## Results
 
