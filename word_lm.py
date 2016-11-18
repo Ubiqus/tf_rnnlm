@@ -284,7 +284,7 @@ def main(_):
 
 
 
-  if not FLAGS.data_path:
+  if not (FLAGS.data_path or ppl):
     raise ValueError("Must set --data_path to data directory")
 
   config = get_config()
@@ -310,8 +310,9 @@ def main(_):
   print(config.vocab_size)
 
   # Load data
-  raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
-  train_data, valid_data, test_data, word_to_id = raw_data
+  if not ppl:
+    raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
+    train_data, valid_data, test_data, word_to_id = raw_data
   with tf.Graph().as_default():
     initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
