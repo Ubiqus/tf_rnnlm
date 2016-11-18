@@ -68,7 +68,7 @@ from config import *
 # Using our custom reader
 import reader
 
-ACTIONS = ["train", "ppl", "predict", "continue"]
+ACTIONS = ["test", "train", "ppl", "predict", "continue"]
 
 flags = tf.flags
 logging = tf.logging
@@ -262,7 +262,6 @@ def get_config():
 
 def _restore_session(saver, session):
   ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)
-  print (ckpt)
   if ckpt and ckpt.model_checkpoint_path:
     saver.restore(session, ckpt.model_checkpoint_path)
     return session
@@ -280,7 +279,7 @@ def main(_):
   ppl = action in ["ppl", "predict"]
   predict = action == "predict"
   test = action == "test"
-  print("Action: "+action)
+  #print("Action: "+action)
 
 
 
@@ -290,9 +289,9 @@ def main(_):
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if action in ["ppl", "predict", "continue"]:
+  if action in ["test", "ppl", "predict", "continue"]:
     #TODO Exception
-    print("Loading word_to_id: "+word_to_id_path)
+    #print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
       word_to_id = pickle.load(f)
 
@@ -306,8 +305,8 @@ def main(_):
   eval_config.num_steps = 1
 
 
-  print(config.__dict__)
-  print(config.vocab_size)
+  #print(config.__dict__)
+  #print(config.vocab_size)
 
   # Load data
   if not ppl:
@@ -371,12 +370,11 @@ def main(_):
         session = _restore_session(saver, session)
 
         if ppl:
+          d = sys.stdin.readline()
+          print("[")
           while True:
             idict = None
 
-            d = sys.stdin.readline()
-            if not d: break
-            if len(d) < 3: print("-1"); continue
             d = d.decode("utf-8").replace("\n", " <eos> ").split()
             test_data = [word_to_id[word] for word in d if word in word_to_id]
             
@@ -388,9 +386,15 @@ def main(_):
             else:
               ppl = run_epoch(session, mtest, test_data)
               print("Test Perplexity: %.3f" % ppl)
- 
+            
+            d = sys.stdin.readline()
+            if not d: break
+            if len(d) < 3: print("-1"); continue
+            print(",", end="")
+
+          print("]")
         elif test:
-          test_perplexity, predictions = run_epoch(session, mtest, test_data)
+          test_perplexity = run_epoch(session, mtest, test_data)
           print("Test Perplexity: %.3f" % test_perplexity)   
                     
 if __name__ == "__main__":
