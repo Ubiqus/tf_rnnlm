@@ -57,7 +57,7 @@ from __future__ import division
 from __future__ import print_function
 
 import time
-
+import json
 import numpy as np
 import tensorflow as tf
 import sys
@@ -68,7 +68,7 @@ from config import *
 # Using our custom reader
 import reader
 
-ACTIONS = ["train", "test", "predict", "continue"]
+ACTIONS = ["train", "ppl", "predict", "continue"]
 
 flags = tf.flags
 logging = tf.logging
@@ -203,10 +203,10 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   iters = 0
   
   state = session.run(model.initial_state)
-
+  predictions = []
   for step, (x, y) in enumerate(reader.iterator(data, model.batch_size,
                                                     model.num_steps)):
-    fetches = {"cost": model.cost, "state": model.final_state}
+    fetches = {"cost": model.cost, "state": model.final_state, "probs": model.probs}
     if eval_op is not None:
       fetches["eval_op"] = eval_op
 
@@ -220,10 +220,24 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
     vals = session.run(fetches, feed_dict)
     cost = vals['cost']
     state = vals['state']
-        
+    probs = vals['probs']
     
     costs += cost
     iters += model.num_steps
+    
+    if idict is not None:
+      probs = probs[0]
+      next_id = np.argmax(probs)
+      xx = x[0][0]
+      yy = y[0][0]
+      prediction = {
+        'word': idict[xx], 
+        "target": idict[yy], 
+        "prob": float(probs[yy]), 
+        "pred_word": idict[next_id],
+        "pred_prob": float(probs[next_id]),
+        }
+      predictions.append(prediction)
 
     if verbose and step % (epoch_size // 10) == 10:
       print("%.3f perplexity: %.3f speed: %.0f wps" %
@@ -235,8 +249,10 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
         saver.save(session, spath)
         model.config.step = step
         model.config.save() 
-
-  return np.exp(costs / iters)
+  ppl = np.exp(costs / iters)
+  if not idict:
+    return ppl
+  return ppl, predictions
 
 
 from config import Config
@@ -259,8 +275,11 @@ import pickle
 def main(_):
   assert(FLAGS.action in ACTIONS)
   action = FLAGS.action
+
   train = action in ["train", "continue"]
+  ppl = action in ["ppl", "predict"]
   predict = action == "predict"
+  test = action == "test"
   print("Action: "+action)
 
 
@@ -271,7 +290,7 @@ def main(_):
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if action in ["test", "predict", "continue"]:
+  if action in ["ppl", "predict", "continue"]:
     #TODO Exception
     print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
@@ -348,21 +367,29 @@ def main(_):
 
   
       else:
-        inverse_dictionary = dict(zip(word_to_id.values(), word_to_id.keys()))	
         session = _restore_session(saver, session)
 
-        if predict:
+        if ppl:
           while True:
+            idict = None
+
             d = sys.stdin.readline()
             if not d: break
             if len(d) < 3: print("-1"); continue
             d = d.decode("utf-8").replace("\n", " <eos> ").split()
             test_data = [word_to_id[word] for word in d if word in word_to_id]
-            test_perplexity = run_epoch(session, mtest, test_data, idict=inverse_dictionary)
-            print("Test Perplexity: %.3f" % test_perplexity)
+            
+            if predict:
+              inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
+              ppl, predict = run_epoch(session, mtest, test_data, idict=inverse_dict)
+              res = {'ppl': ppl, 'predictions': predict}
+              print(json.dumps(res))
+            else:
+              ppl = run_epoch(session, mtest, test_data)
+              print("Test Perplexity: %.3f" % ppl)
  
-        else:
-          test_perplexity = run_epoch(session, mtest, test_data, idict=inverse_dictionary)
+        elif test:
+          test_perplexity, predictions = run_epoch(session, mtest, test_data)
           print("Test Perplexity: %.3f" % test_perplexity)   
                     
 if __name__ == "__main__":
