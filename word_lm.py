@@ -148,10 +148,22 @@ class Model(object):
         "softmax_w", [size, vocab_size], dtype=data_type())
     softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
     self.logits = logits = tf.matmul(output, softmax_w) + softmax_b
-    loss = tf.nn.seq2seq.sequence_loss_by_example(
+    loss_fct = "softmax"
+    if loss_fct == "softmax":
+      loss = tf.nn.seq2seq.sequence_loss_by_example(
         [logits],
         [tf.reshape(self._targets, [-1])],
         [tf.ones([batch_size * num_steps], dtype=data_type())])
+    elif loss_fct == "nce":
+      # thx to http://stackoverflow.com/questions/38363672/train-tensorflow-language-model-with-nce-or-sampled-softmax
+      num_samples = 10
+      labels = tf.reshape(self._targets, [-1,1])
+      hidden = output
+      loss = tf.nn.nce_loss(w_t, b,                           
+                            hidden,
+                            labels,
+                            num_samples, 
+                            vocab_size) 
     self._cost = cost = tf.reduce_sum(loss) / batch_size
     self._final_state = state 
     self.probs = tf.nn.softmax(logits)
@@ -303,9 +315,9 @@ def main(_):
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if not train:
+  if linebyline or action=="continue":
     #TODO Exception
-    #print("Loading word_to_id: "+word_to_id_path)
+    print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
       word_to_id = pickle.load(f)
 
@@ -408,7 +420,7 @@ def main(_):
 
           if predict: print("]")
 
-        # Whole text processing
+          # Whole text processing
         elif test:
           test_perplexity = run_epoch(session, mtest, test_data)
           print("Test Perplexity: %.3f" % test_perplexity)   
