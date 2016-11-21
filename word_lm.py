@@ -337,7 +337,7 @@ def main(_):
     config.epoch = 0
     config.step = 0
  
-  eval_config = config
+  eval_config = Config(clone=config)
   eval_config.batch_size = 1
   eval_config.num_steps = 1
 

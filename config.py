@@ -3,9 +3,13 @@ import json
 class Config:
   """Configuration object loaded from/saved to JSON object
   """
-  def __init__(self, config=None, path=None):
-    self.path = path
-    if config is not None:
+  def __init__(self, config=None, path=None, clone=None):
+
+    if clone is not None:
+      self.path = clone.path
+      entries = clone.__dict__	
+    elif config is not None:
+      self.path = path
       entries = self._get_config(config)
     elif path is not None:
       entries = self._load()
