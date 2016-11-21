@@ -52,6 +52,7 @@ To run:
 $ python ptb_word_lm.py --data_path=simple-examples/data/
 
 """
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
@@ -68,7 +69,7 @@ from config import *
 # Using our custom reader
 import reader
 
-ACTIONS = ["test", "train", "ppl", "predict", "continue"]
+ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
 
 flags = tf.flags
 logging = tf.logging
@@ -195,8 +196,16 @@ class Model(object):
     return self._train_op
 
 
-def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, saver=None):
-  """Runs the model on the given data."""
+def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, saver=None, loglikes=False):
+  """Runs the model on the given data.
+      Returns:
+        - if idict is set (prediction mode):
+            a tuple ppl, predictions
+        - else if loglikes:
+            loglikes (-costs/log(10))
+        - else:
+            perxplexity= exp(costs/iters)
+  """
   epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
   start_time = time.time()
   costs = 0.0
@@ -249,9 +258,12 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
         saver.save(session, spath)
         model.config.step = step
         model.config.save() 
+  
   ppl = np.exp(costs / iters)
+  ll = -costs / np.log(10)
   if not idict:
-    return ppl
+    ret = ll if loglikes else ppl  
+    return ret
   return ppl, predictions
 
 
@@ -276,20 +288,22 @@ def main(_):
   action = FLAGS.action
 
   train = action in ["train", "continue"]
-  ppl = action in ["ppl", "predict"]
+  ppl = action == "ppl"
+  loglikes = action == "loglikes"
   predict = action == "predict"
+  linebyline = ppl or loglikes or predict
   test = action == "test"
   #print("Action: "+action)
 
 
 
-  if not (FLAGS.data_path or ppl):
+  if not (FLAGS.data_path or linebyline):
     raise ValueError("Must set --data_path to data directory")
 
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if action in ["test", "ppl", "predict", "continue"]:
+  if not train:
     #TODO Exception
     #print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
@@ -309,7 +323,7 @@ def main(_):
   #print(config.vocab_size)
 
   # Load data
-  if not ppl:
+  if not linebyline:
     raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
     train_data, valid_data, test_data, word_to_id = raw_data
   with tf.Graph().as_default():
@@ -362,34 +376,39 @@ def main(_):
 
           config.epoch += 1
           config.save()
-  
+        
       else:
         session = _restore_session(saver, session)
 
-        if ppl:
+        # Line by line processing (=ppl, predict, loglikes)
+        if linebyline:
           d = sys.stdin.readline()
-          print("[")
+          if predict: print("[")
           while True:
             idict = None
-
+            
             d = d.decode("utf-8").replace("\n", " <eos> ").split()
             test_data = [word_to_id[word] for word in d if word in word_to_id]
-            
+           
+            # Prediction mode
             if predict:
               inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
               ppl, predict = run_epoch(session, mtest, test_data, idict=inverse_dict)
               res = {'ppl': ppl, 'predictions': predict}
-              print(json.dumps(res))
+              print(json.dumps(res)+",")
+            
+            # ppl or loglikes
             else:
-              ppl = run_epoch(session, mtest, test_data)
-              print("Test Perplexity: %.3f" % ppl)
+              o = run_epoch(session, mtest, test_data, loglikes=loglikes)
+              print("%.3f" % o)
             
             d = sys.stdin.readline()
             if not d: break
             if len(d) < 3: print("-1"); continue
-            print(",", end="")
 
-          print("]")
+          if predict: print("]")
+
+        # Whole text processing
         elif test:
           test_perplexity = run_epoch(session, mtest, test_data)
           print("Test Perplexity: %.3f" % test_perplexity)   
