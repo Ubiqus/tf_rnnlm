@@ -52,15 +52,16 @@ To run:
 $ python ptb_word_lm.py --data_path=simple-examples/data/
 
 """
+
 from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
 import time
-
+import json
 import numpy as np
 import tensorflow as tf
-
+import sys
 # We put config in a separate file so that loading a config object does (using pickle)
 # import this file twice (which triggers error)
 from config import *
@@ -68,7 +69,7 @@ from config import *
 # Using our custom reader
 import reader
 
-ACTIONS = ["train", "test", "predict", "continue"]
+ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
 
 flags = tf.flags
 logging = tf.logging
@@ -90,27 +91,21 @@ def data_type():
   return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
-class Input(object):
-  """The input data."""
 
-  def __init__(self, config, data, name=None):
-    self.batch_size = batch_size = config.batch_size
-    self.num_steps = num_steps = config.num_steps
-    self.epoch_size = ((len(data) // batch_size) - 1) // num_steps
-    self.input_data, self.targets = reader.producer(
-        data, batch_size, num_steps, name=name)
 
 
 class Model(object):
   """The model."""
 
-  def __init__(self, is_training, config, input_):
-    self._input = input_
+  def __init__(self, is_training, config):
     self.config = config
-    batch_size = input_.batch_size
-    num_steps = input_.num_steps
+    self.batch_size = batch_size = config.batch_size
+    self.num_steps = num_steps = config.num_steps
     size = config.hidden_size
     vocab_size = config.vocab_size
+
+    self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
+    self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
 
     # Slightly better results can be obtained with forget gate biases
     # initialized to 1 but the hyperparameters of the model would need to be
@@ -126,7 +121,7 @@ class Model(object):
     with tf.device("/cpu:0"):
       embedding = tf.get_variable(
           "embedding", [vocab_size, size], dtype=data_type())
-      inputs = tf.nn.embedding_lookup(embedding, input_.input_data)
+      inputs = tf.nn.embedding_lookup(embedding, self._input_data)
 
     if is_training and config.keep_prob < 1:
       inputs = tf.nn.dropout(inputs, config.keep_prob)
@@ -155,12 +150,10 @@ class Model(object):
     self.logits = logits = tf.matmul(output, softmax_w) + softmax_b
     loss = tf.nn.seq2seq.sequence_loss_by_example(
         [logits],
-        [tf.reshape(input_.targets, [-1])],
+        [tf.reshape(self._targets, [-1])],
         [tf.ones([batch_size * num_steps], dtype=data_type())])
     self._cost = cost = tf.reduce_sum(loss) / batch_size
-    self._final_state = state
-    self._inputs = input_.input_data
-    self._targets = input_.targets
+    self._final_state = state 
     self.probs = tf.nn.softmax(logits)
     if not is_training:
       return
@@ -181,9 +174,6 @@ class Model(object):
   def assign_lr(self, session, lr_value):
     session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
 
-  @property
-  def input(self):
-    return self._input
 
   @property
   def initial_state(self):
@@ -206,84 +196,75 @@ class Model(object):
     return self._train_op
 
 
-def run_epoch(session, model, eval_op=None, verbose=False, idict=None):
-  """Runs the model on the given data."""
+def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, saver=None, loglikes=False):
+  """Runs the model on the given data.
+      Returns:
+        - if idict is set (prediction mode):
+            a tuple ppl, predictions
+        - else if loglikes:
+            loglikes (-costs/log(10))
+        - else:
+            perxplexity= exp(costs/iters)
+  """
+  epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
   start_time = time.time()
   costs = 0.0
   iters = 0
-  state = session.run(model.initial_state)
   
-  prob_tot = 0
+  state = session.run(model.initial_state)
+  predictions = []
+  for step, (x, y) in enumerate(reader.iterator(data, model.batch_size,
+                                                    model.num_steps)):
+    fetches = {"cost": model.cost, "state": model.final_state, "probs": model.probs}
+    if eval_op is not None:
+      fetches["eval_op"] = eval_op
 
-  fetches = {
-      "cost": model.cost,
-      "final_state": model.final_state,
-      "probs": model.probs,
-      "inputs": model._inputs,
-      "targets": model._targets,
-      "logits": model.logits,
-  }
-  if eval_op is not None:
-    fetches["eval_op"] = eval_op
-
-  for step in range(model.input.epoch_size):
     feed_dict = {}
+    feed_dict[model._input_data] = x
+    feed_dict[model._targets] = y
     for i, (c, h) in enumerate(model.initial_state):
       feed_dict[c] = state[i].c
       feed_dict[h] = state[i].h
-
+    
     vals = session.run(fetches, feed_dict)
-    cost = vals["cost"]
-    state = vals["final_state"]
+    cost = vals['cost']
+    state = vals['state']
+    probs = vals['probs']
     
-    logits = vals["logits"]
-    probs = vals["probs"]
-    inputs = vals["inputs"]
-    targets = vals["targets"]
-
     costs += cost
-    iters += model.input.num_steps
-
-    #print(logits.shape)
-    #print(logits)
-    #print(probs)
-    #print(probs.shape)
-    #print(targets)
+    iters += model.num_steps
     
-    #n = model.config.num_steps - 1
-    #probs = probs[n]
-    #decoded_word_id = int(np.argmax(probs))
-    #decoded_word_prob = probs[decoded_word_id]
-    #decoded_word = idict[decoded_word_id]
+    if idict is not None:
+      probs = probs[0]
+      next_id = np.argmax(probs)
+      xx = x[0][0]
+      yy = y[0][0]
+      prediction = {
+        'word': idict[xx], 
+        "target": idict[yy], 
+        "prob": float(probs[yy]), 
+        "pred_word": idict[next_id],
+        "pred_prob": float(probs[next_id]),
+        }
+      predictions.append(prediction)
 
-    #input_word = " ".join([idict[int(x1)] for x1 in np.nditer(inputs)])
-
-    #expected_word_id = targets[0][n]
-    #expected_word = idict[expected_word_id]
-    #expected_word_prob = probs[expected_word_id]
-
-
-    #prob_tot += np.log(expected_word_prob)
-    
-    #print(logits.shape)
-
-    #print(inputs)
-    #print("Step: "+str(step)+" [%s] [%s](%f) [%s](%f)" % (input_word, decoded_word, decoded_word_prob, expected_word, expected_word_prob))
-    #print(inputs.shape)
-    #print(np.sum(inputs))
-    #print(targets.shape)
-    #print(targets)
-
-
-    if verbose and step % (model.input.epoch_size // 10) == 10:
+    if verbose and step % (epoch_size // 10) == 10:
       print("%.3f perplexity: %.3f speed: %.0f wps" %
-            (step * 1.0 / model.input.epoch_size, np.exp(costs / iters),
-             iters * model.input.batch_size / (time.time() - start_time)))
-
-  #print("PROB_TOT %f" % (np.exp((-1/iters)*prob_tot)))
-  #NOTE = PPL
-  return np.exp(costs / iters)
-
+            (step * 1.0 / epoch_size, np.exp(costs / iters),
+             iters * model.batch_size / (time.time() - start_time)))
+      if saver is not None:
+        spath = os.path.join(FLAGS.model_dir, "ep_%d_step_%d.ckpt" % (model.config.epoch, step))
+        print("Saving %s" % spath)
+        saver.save(session, spath)
+        model.config.step = step
+        model.config.save() 
+  
+  ppl = np.exp(costs / iters)
+  ll = -costs / np.log(10)
+  if not idict:
+    ret = ll if loglikes else ppl  
+    return ret
+  return ppl, predictions
 
 
 from config import Config
@@ -293,7 +274,6 @@ def get_config():
 
 def _restore_session(saver, session):
   ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)
-  print (ckpt)
   if ckpt and ckpt.model_checkpoint_path:
     saver.restore(session, ckpt.model_checkpoint_path)
     return session
@@ -304,38 +284,48 @@ def _restore_session(saver, session):
 import os
 import pickle
 def main(_):
-  if not FLAGS.data_path:
-    raise ValueError("Must set --data_path to data directory")
-
   assert(FLAGS.action in ACTIONS)
   action = FLAGS.action
+
   train = action in ["train", "continue"]
-  print("Action: "+action)
+  ppl = action == "ppl"
+  loglikes = action == "loglikes"
+  predict = action == "predict"
+  linebyline = ppl or loglikes or predict
+  test = action == "test"
+  #print("Action: "+action)
+
+
+
+  if not (FLAGS.data_path or linebyline):
+    raise ValueError("Must set --data_path to data directory")
 
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if action in ["test", "predict", "continue"]:
+  if not train:
     #TODO Exception
-    print("Loading word_to_id: "+word_to_id_path)
+    #print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
       word_to_id = pickle.load(f)
 
   else:
     word_to_id = None
     config.epoch = 0
+    config.step = 0
  
   eval_config = config
   eval_config.batch_size = 1
   eval_config.num_steps = 1
 
 
-  print(config.vocab_size)
+  #print(config.__dict__)
+  #print(config.vocab_size)
 
   # Load data
-  raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
-  train_data, valid_data, test_data, word_to_id = raw_data
-
+  if not linebyline:
+    raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
+    train_data, valid_data, test_data, word_to_id = raw_data
   with tf.Graph().as_default():
     initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
@@ -347,53 +337,81 @@ def main(_):
         pickle.dump(word_to_id, f)
 
       with tf.name_scope("Train"):
-        train_input = Input(config=config, data=train_data, name="TrainInput")
         with tf.variable_scope("Model", reuse=False, initializer=initializer):
-          m = Model(is_training=True, config=config, input_=train_input)
+          m = Model(is_training=True, config=config)
         tf.scalar_summary("Training Loss", m.cost)
         tf.scalar_summary("Learning Rate", m.lr)
       
       with tf.name_scope("Valid"):
-        valid_input = Input(config=config, data=valid_data, name="ValidInput")
         with tf.variable_scope("Model", reuse=True, initializer=initializer):
-          mvalid = Model(is_training=False, config=config, input_=valid_input)
+          mvalid = Model(is_training=False, config=config)
         tf.scalar_summary("Validation Loss", mvalid.cost)
     
     with tf.name_scope("Test"):
-      test_input = Input(config=eval_config, data=test_data, name="TestInput")
       with tf.variable_scope("Model", reuse=train, initializer=initializer):
-        mtest = Model(is_training=False, config=eval_config,
-                         input_=test_input)
+        mtest = Model(is_training=False, config=eval_config)
 
-    
-    sv = tf.train.Supervisor(logdir=FLAGS.model_dir)
-    with sv.managed_session() as session:
+   
+    saver = tf.train.Saver()
+    init_op = tf.initialize_all_variables()
+    with tf.Session() as session:
+      session.run(init_op)
       if train:
-        print("Starting training from epoch %d" % config.epoch)
+        config.save()
+        if action == "continue":
+          session = _restore_session(saver, session)
+        
+        print("Starting training from epoch %d" % (config.epoch+1))
         while config.epoch < config.max_max_epoch:
           i = config.epoch
           lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
           m.assign_lr(session, config.learning_rate * lr_decay)
 
           print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-          train_perplexity = run_epoch(session, m, eval_op=m.train_op,
-                                       verbose=True)
+          train_perplexity = run_epoch(session, m, train_data, eval_op=m.train_op,
+                                       verbose=True, saver=saver)
           print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
-          valid_perplexity = run_epoch(session, mvalid)
+          valid_perplexity = run_epoch(session, mvalid, valid_data)
           print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
 
           config.epoch += 1
           config.save()
         
-        print("Saving model to %s." % FLAGS.model_dir)
-        sv.saver.save(session, FLAGS.save_path, global_step=sv.global_step)
-
-  
       else:
-        inverse_dictionary = dict(zip(word_to_id.values(), word_to_id.keys()))	
-        session = _restore_session(sv.saver, session)
-        test_perplexity = run_epoch(session, mtest, idict=inverse_dictionary)
-        print("Test Perplexity: %.3f" % test_perplexity)   
+        session = _restore_session(saver, session)
+
+        # Line by line processing (=ppl, predict, loglikes)
+        if linebyline:
+          d = sys.stdin.readline()
+          if predict: print("[")
+          while True:
+            idict = None
+            
+            d = d.decode("utf-8").replace("\n", " <eos> ").split()
+            test_data = [word_to_id[word] for word in d if word in word_to_id]
+           
+            # Prediction mode
+            if predict:
+              inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
+              ppl, predict = run_epoch(session, mtest, test_data, idict=inverse_dict)
+              res = {'ppl': ppl, 'predictions': predict}
+              print(json.dumps(res)+",")
+            
+            # ppl or loglikes
+            else:
+              o = run_epoch(session, mtest, test_data, loglikes=loglikes)
+              print("%.3f" % o)
+            
+            d = sys.stdin.readline()
+            if not d: break
+            if len(d) < 3: print("-1"); continue
+
+          if predict: print("]")
+
+        # Whole text processing
+        elif test:
+          test_perplexity = run_epoch(session, mtest, test_data)
+          print("Test Perplexity: %.3f" % test_perplexity)   
                     
 if __name__ == "__main__":
   tf.app.run()

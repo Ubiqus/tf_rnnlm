@@ -21,7 +21,7 @@ from __future__ import print_function
 
 import collections
 import os
-
+import numpy as np
 import tensorflow as tf
   
 
@@ -88,42 +88,39 @@ def raw_data(data_path=None, training=True, word_to_id=None):
   return train_data, valid_data, test_data, word_to_id
 
 
-def producer(raw_data, batch_size, num_steps, name=None):
-  """Iterate on the raw data.
-
-  This chunks up raw_data into batches of examples and returns Tensors that
-  are drawn from these batches.
-
+def iterator(raw_data, batch_size, num_steps):
+  """Iterate on the raw PTB data.
+  This generates batch_size pointers into the raw PTB data, and allows
+  minibatch iteration along these pointers.
   Args:
-    raw_data: one of the raw data outputs from raw_data.
+    raw_data: one of the raw data outputs from ptb_raw_data.
     batch_size: int, the batch size.
     num_steps: int, the number of unrolls.
-    name: the name of this operation (optional).
-
-  Returns:
-    A pair of Tensors, each shaped [batch_size, num_steps]. The second element
-    of the tuple is the same data time-shifted to the right by one.
-
+  Yields:
+    Pairs of the batched data, each a matrix of shape [batch_size, num_steps].
+    The second element of the tuple is the same data time-shifted to the
+    right by one.
   Raises:
-    tf.errors.InvalidArgumentError: if batch_size or num_steps are too high.
+    ValueError: if batch_size or num_steps are too high.
   """
-  with tf.name_scope(name, "Producer", [raw_data, batch_size, num_steps]):
-    raw_data = tf.convert_to_tensor(raw_data, name="raw_data", dtype=tf.int32)
+  # PTB Iterator from tensorflow.models.rnn.ptb.reader.py
+  # on TensorFlow 0.11
+  # https://github.com/tensorflow/tensorflow/blob/282823b877f173e6a33bbc9d4b9ad7dd8413ada6/tensorflow/models/rnn/ptb/reader.py
+  raw_data = np.array(raw_data, dtype=np.int32)
 
-    data_len = tf.size(raw_data)
-    batch_len = data_len // batch_size
-    data = tf.reshape(raw_data[0 : batch_size * batch_len],
-                      [batch_size, batch_len])
+  data_len = len(raw_data)
+  batch_len = data_len // batch_size
+  data = np.zeros([batch_size, batch_len], dtype=np.int32)
+  for i in range(batch_size):
+    data[i] = raw_data[batch_len * i:batch_len * (i + 1)]
 
-    epoch_size = (batch_len - 1) // num_steps
-    assertion = tf.assert_positive(
-        epoch_size,
-        message="epoch_size == 0, decrease batch_size or num_steps")
-    with tf.control_dependencies([assertion]):
-      epoch_size = tf.identity(epoch_size, name="epoch_size")
+  epoch_size = (batch_len - 1) // num_steps
 
-    i = tf.train.range_input_producer(epoch_size, shuffle=False).dequeue()
-    x = tf.slice(data, [0, i * num_steps], [batch_size, num_steps])
-    y = tf.slice(data, [0, i * num_steps + 1], [batch_size, num_steps])
-    return x, y
+  if epoch_size == 0:
+    raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
+
+  for i in range(epoch_size):
+    x = data[:, i*num_steps:(i+1)*num_steps]
+    y = data[:, i*num_steps+1:(i+1)*num_steps+1]
+    yield (x, y)
 
