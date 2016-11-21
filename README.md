@@ -12,6 +12,12 @@ The tutorial uses the PTB dataset ([tgz](http://www.fit.vutbr.cz/~imikolov/rnnlm
 - [Nelken's "tf" repo](https://github.com/nelken/tf) inspired our work by the way it implements features we are interested in. 
 - [Benoit Favre's tf rnn lm](https://gitlab.lif.univ-mrs.fr/benoit.favre/tf_lm/blob/200645ab5aa446b72cf30c14355126062070f676/tf_lm.py)
 
+
+## Motivations
+* Getting started with TensorFlow
+* Make RNN LM manipulation easy in practice (easily look/edit configs, cancel/resume training, multiple outputs...)
+* Train RNN LM for ASR using Kaldi (especially using `loglikes` mode)
+
 ## Quickstart
 
 ```
@@ -65,9 +71,18 @@ python word_lm.py --action test --data_path=./simple-examples/data --model_dir=.
 ```
 
 ## Line by line perplexity (--action ppl)
-Running the model on each `stdin` line and returning its perplexity
+Running the model on each `stdin` line and returning its perplexity (precisely 'per-word perplexity' i.e. `exp(costs/iters)`
 ```
 cat ./data/test.txt | python word_lm.py --action ppl --model_dir=./model
+```
+
+
+## Line by line loglikes (--action loglikes)
+Running the model on each `stdin` line and returning its 'loglikes' (i.e. `-costs/log(10)`).
+
+**Note:** in particular, it is meant to be used for Kaldi's rescoring.
+```
+cat ./data/test.txt | python word_lm.py --action loglikes --model_dir=./model
 ```
 
 ## Line by line prediction (--action predict)
