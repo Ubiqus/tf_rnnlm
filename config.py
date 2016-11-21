@@ -12,6 +12,7 @@ class Config:
       self.path = path
       entries = self._get_config(config)
     elif path is not None:
+      self.path = path
       entries = self._load()
     else:
       raise ValueError("Parameters 'config' and 'path' can't be both 'None'")
