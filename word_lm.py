@@ -70,6 +70,7 @@ from config import *
 import reader
 
 ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
+LOSS_FCTS = ["softmax", "nce"]
 
 flags = tf.flags
 logging = tf.logging
@@ -81,6 +82,8 @@ flags.DEFINE_string(
     "A type of model. Possible options are: 'small', 'medium', 'large' or path to config file.")
 flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
+flags.DEFINE_string("loss", "softmax", 
+                    "The loss function to use. Possible options are %s" % ", ".join(LOSS_FCTS))
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
@@ -97,12 +100,13 @@ def data_type():
 class Model(object):
   """The model."""
 
-  def __init__(self, is_training, config):
+  def __init__(self, is_training, config, loss_fct="softmax"):
     self.config = config
     self.batch_size = batch_size = config.batch_size
     self.num_steps = num_steps = config.num_steps
     size = config.hidden_size
     vocab_size = config.vocab_size
+    self.loss_fct = loss_fct
 
     self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
     self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
@@ -144,26 +148,30 @@ class Model(object):
         outputs.append(cell_output)
 
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
-    softmax_w = tf.get_variable(
+    w = tf.get_variable(
         "softmax_w", [size, vocab_size], dtype=data_type())
-    softmax_b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
-    self.logits = logits = tf.matmul(output, softmax_w) + softmax_b
-    loss_fct = "softmax"
-    if loss_fct == "softmax":
+    b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
+    self.logits = logits = tf.matmul(output, w) + b
+   
+    
+    if self.loss_fct == "softmax":
       loss = tf.nn.seq2seq.sequence_loss_by_example(
         [logits],
         [tf.reshape(self._targets, [-1])],
         [tf.ones([batch_size * num_steps], dtype=data_type())])
-    elif loss_fct == "nce":
+    elif self.loss_fct == "nce":
       # thx to http://stackoverflow.com/questions/38363672/train-tensorflow-language-model-with-nce-or-sampled-softmax
       num_samples = 10
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
+      w_t = tf.transpose(w)
       loss = tf.nn.nce_loss(w_t, b,                           
                             hidden,
                             labels,
                             num_samples, 
-                            vocab_size) 
+                            vocab_size)
+    else:
+      raise ValueError("Unsupported loss function: %s" % loss_fct) 
     self._cost = cost = tf.reduce_sum(loss) / batch_size
     self._final_state = state 
     self.probs = tf.nn.softmax(logits)
@@ -297,6 +305,9 @@ import os
 import pickle
 def main(_):
   assert(FLAGS.action in ACTIONS)
+  assert(FLAGS.loss in LOSS_FCTS)
+  
+  loss_fct = FLAGS.loss
   action = FLAGS.action
 
   train = action in ["train", "continue"]
@@ -326,7 +337,7 @@ def main(_):
     config.epoch = 0
     config.step = 0
  
-  eval_config = config
+  eval_config = Config(clone=config)
   eval_config.batch_size = 1
   eval_config.num_steps = 1
 
@@ -350,7 +361,7 @@ def main(_):
 
       with tf.name_scope("Train"):
         with tf.variable_scope("Model", reuse=False, initializer=initializer):
-          m = Model(is_training=True, config=config)
+          m = Model(is_training=True, config=config, loss_fct=loss_fct)
         tf.scalar_summary("Training Loss", m.cost)
         tf.scalar_summary("Learning Rate", m.lr)
       
@@ -373,7 +384,7 @@ def main(_):
         if action == "continue":
           session = _restore_session(saver, session)
         
-        print("Starting training from epoch %d" % (config.epoch+1))
+        print("Starting training from epoch %d using %s" % (config.epoch+1, loss_fct))
         while config.epoch < config.max_max_epoch:
           i = config.epoch
           lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
