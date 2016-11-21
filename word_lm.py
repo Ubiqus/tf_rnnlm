@@ -362,9 +362,6 @@ def main(_):
 
           config.epoch += 1
           config.save()
-        
-          saver.save(session, FLAGS.model_dir, global_step=i*1000)
-
   
       else:
         session = _restore_session(saver, session)
