@@ -329,7 +329,7 @@ def main(_):
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if linebyline or action=="continue":
+  if action != "train":
     #TODO Exception
     print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
