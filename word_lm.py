@@ -89,6 +89,8 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
+flags.DEFINE_integer("log", 10, "How often to print information and save model: each (epoch_size/log) steps. (--log 100: each 1% --log 50: each 2%, --log 10: each 10% etc")
+
 FLAGS = flags.FLAGS
 
 
@@ -249,7 +251,7 @@ class Model(object):
     return self._train_op
 
 
-def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, saver=None, loglikes=False):
+def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, saver=None, loglikes=False, log=10):
   """Runs the model on the given data.
       Returns:
         - if idict is set (prediction mode):
@@ -301,7 +303,9 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
         }
       predictions.append(prediction)
 
-    if verbose and step % (epoch_size // 10) == 10:
+    if log<0 or log>100:
+      log = 10
+    if verbose and step % (epoch_size // log) == 1:
       print("%.3f perplexity: %.3f speed: %.0f wps" %
             (step * 1.0 / epoch_size, np.exp(costs / iters),
              iters * model.batch_size / (time.time() - start_time)))
@@ -359,7 +363,7 @@ def main(_):
   config = get_config()
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
-  if linebyline or action=="continue":
+  if action != "train":
     #TODO Exception
     print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
@@ -419,6 +423,7 @@ def main(_):
        
         saver = None if FLAGS.nosave else saver 
         print("Starting training from epoch %d using %s" % (config.epoch+1, loss_fct))
+        
         while config.epoch < config.max_max_epoch:
           i = config.epoch
           lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
@@ -426,7 +431,7 @@ def main(_):
 
           print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
           train_perplexity = run_epoch(session, m, train_data, eval_op=m.train_op,
-                                       verbose=True, saver=saver)
+                                       verbose=True, saver=saver, log=FLAGS.log)
           print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
           valid_perplexity = run_epoch(session, mvalid, valid_data)
           print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
