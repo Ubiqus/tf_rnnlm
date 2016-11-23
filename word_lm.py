@@ -57,6 +57,7 @@ from __future__ import absolute_import
 from __future__ import division
 from __future__ import print_function
 
+import math
 import time
 import json
 import numpy as np
@@ -70,7 +71,7 @@ from config import *
 import reader
 
 ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
-LOSS_FCTS = ["softmax", "nce"]
+LOSS_FCTS = ["softmax", "nce", "sampledsoftmax", "seq", "seqex"]
 
 flags = tf.flags
 logging = tf.logging
@@ -87,6 +88,7 @@ flags.DEFINE_string("loss", "softmax",
 flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
+flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
 FLAGS = flags.FLAGS
 
 
@@ -148,28 +150,59 @@ class Model(object):
         outputs.append(cell_output)
 
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
-    w = tf.get_variable(
-        "softmax_w", [size, vocab_size], dtype=data_type())
-    b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
+    #w = tf.get_variable(
+    #    "softmax_w", [size, vocab_size], dtype=data_type())
+    w = tf.Variable(tf.truncated_normal([size, vocab_size], stddev=1.0 / math.sqrt(size)))
+    w_t = tf.transpose(w)
+
+    #w_t = tf.Variable(tf.truncated_normal([vocab_size, size], stddev=1.0 / math.sqrt(size))) 
+    #w = tf.transpose(w_t)
+    
+    #b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
+    b = tf.Variable(tf.zeros([vocab_size]))
     self.logits = logits = tf.matmul(output, w) + b
    
     
     if self.loss_fct == "softmax":
-      loss = tf.nn.seq2seq.sequence_loss_by_example(
-        [logits],
-        [tf.reshape(self._targets, [-1])],
-        [tf.ones([batch_size * num_steps], dtype=data_type())])
+      loss = tf.nn.softmax(logits)
+      #loss = tf.nn.seq2seq.sequence_loss_by_example(
+      #  [logits],
+      #  [tf.reshape(self._targets, [-1])],
+      #  [tf.ones([batch_size * num_steps], dtype=data_type())])
     elif self.loss_fct == "nce":
       # thx to http://stackoverflow.com/questions/38363672/train-tensorflow-language-model-with-nce-or-sampled-softmax
-      num_samples = 10
+      
+      num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
-      w_t = tf.transpose(w)
+      #w_t = tf.transpose(w)
       loss = tf.nn.nce_loss(w_t, b,                           
                             hidden,
                             labels,
                             num_samples, 
                             vocab_size)
+    elif self.loss_fct == "sampledsoftmax":
+      w_t = tf.transpose(w)	
+      num_samples = 64
+      labels = tf.reshape(self._targets, [-1,1])
+      hidden = output
+      loss = tf.nn.sampled_softmax_loss(w_t, b,
+                                        hidden, 
+                                        labels, 
+                                        num_samples,
+                                        vocab_size)
+    elif self.loss_fct == "seq":
+      loss = tf.nn.seq2seq.sequence_loss(
+        [logits],
+        [tf.reshape(self._targets, [-1])],
+        [tf.ones([batch_size * num_steps], dtype=data_type())])
+    
+    elif self.loss_fct == "seqex":
+      loss = tf.nn.seq2seq.sequence_loss_by_example(
+        [logits],
+        [tf.reshape(self._targets, [-1])],
+        [tf.ones([batch_size * num_steps], dtype=data_type())])
+
     else:
       raise ValueError("Unsupported loss function: %s" % loss_fct) 
     self._cost = cost = tf.reduce_sum(loss) / batch_size
@@ -383,7 +416,8 @@ def main(_):
         config.save()
         if action == "continue":
           session = _restore_session(saver, session)
-        
+       
+        saver = None if FLAGS.nosave else saver 
         print("Starting training from epoch %d using %s" % (config.epoch+1, loss_fct))
         while config.epoch < config.max_max_epoch:
           i = config.epoch
