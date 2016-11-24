@@ -1,36 +1,36 @@
-Comparing word per second rate using different loss function on different configuration.
-loss_fct: {softmax, sampledsoftmax, nce, seq, seqex}
-config: {smsm, smlg, lgsm, lglg}
+# Comparing word per second rate using different loss function on different configuration.
+*23 nov, 2016 - pltrdy*  
+*Using commit: 571e7ad711b975901c5894277e89fe0b511a1de0* 
 
+**loss_fct:** {softmax, sampledsoftmax, nce, seq, seqex}  
+**config:** {smsm, smlg, lgsm, lglg}  
 
-23 nov, 2016 - pltrdy
-Using commit: 571e7ad711b975901c5894277e89fe0b511a1de0
-
-Configs are called '(sm|lg)(sm|lg)'
-  First part stands for the default config as defined in 'config.py'.
-  Second stands for vocabulary size: 'sm'= 10K; 'lg'=150K
-    ex: 'smsm': {hidden_size: 200; num_steps: 20; vocab_size: 10000}
-        'lglg': {hidden_size: 650; num_steps: 35; vocab_size: 150000}
+Configs are called '(sm|lg)(sm|lg)'  
+  First part stands for the default config as defined in 'config.py'.  
+  Second stands for vocabulary size: 'sm'= 10K; 'lg'=150K  
+    ex: 'smsm': {hidden_size: 200; num_steps: 20; vocab_size: 10000}  
+        'lglg': {hidden_size: 650; num_steps: 35; vocab_size: 150000}  
 
 All cases are train for 1 epoch. Not saving checkpoint files.
 Using GPU nVidia 980Ti.
 
 k-Word per sec:
-  
-  | config | softmax| sampledsoftmax | nce    | seq   | seqex |
-  |--------|--------|----------------|--------|-------|-------|
-  | smsm   | 18.5   | 19. 0          | 19.3   | 18.6  | 1.8   |
-  | smlg   | 1.5    | 1.3            | 1.3    | 1.3   | 1.4   |
-  | lgsm   | 8.8    | 8.8            | 8.9    | 8.8   | 8.8   |
-  | lglg   | 1.0    | 1.0            | 1.0    | 0.93  | 9.9   |
+
+| config | softmax| sampledsoftmax | nce    | seq   | seqex |
+|--------|--------|----------------|--------|-------|-------|
+| smsm   | 18.5   | 19. 0          | 19.3   | 18.6  | 1.8   |
+| smlg   | 1.5    | 1.3            | 1.3    | 1.3   | 1.4   |
+| lgsm   | 8.8    | 8.8            | 8.9    | 8.8   | 8.8   |
+| lglg   | 1.0    | 1.0            | 1.0    | 0.93  | 9.9   |
 
 Run time:
-  | config | softmax| sampledsoftmax | nce    | seq   | seqex |
-  |--------|--------|----------------|--------|-------|-------|
-  | smsm   | 0m56s  | 0m55s          | 0m54s  | 0m56s | 0m56s |
-  | smlg   | 10m45s | 12m28s         | 12m14s | 12m53s| 12m6s |
-  | lgsm   | 1m55s  | 1m55s          | 1m55s  | 1m56s | 1m55s |
-  | lglg   | 16m27s | 16m7s          | 16m31s | 17m48s| 16m42s|
+
+| config | softmax| sampledsoftmax | nce    | seq   | seqex |
+|--------|--------|----------------|--------|-------|-------|
+| smsm   | 0m56s  | 0m55s          | 0m54s  | 0m56s | 0m56s |
+| smlg   | 10m45s | 12m28s         | 12m14s | 12m53s| 12m6s |
+| lgsm   | 1m55s  | 1m55s          | 1m55s  | 1m56s | 1m55s |
+| lglg   | 16m27s | 16m7s          | 16m31s | 17m48s| 16m42s|
 
 
 ======== softmax smsm ============
