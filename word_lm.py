@@ -152,16 +152,17 @@ class Model(object):
         outputs.append(cell_output)
 
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
-    #w = tf.get_variable(
-    #    "softmax_w", [size, vocab_size], dtype=data_type())
-    w = tf.Variable(tf.truncated_normal([size, vocab_size], stddev=1.0 / math.sqrt(size)))
+    w = tf.get_variable(
+        "softmax_w", [size, vocab_size], dtype=data_type())
     w_t = tf.transpose(w)
+    #w = tf.Variable(tf.truncated_normal([size, vocab_size], stddev=1.0 / math.sqrt(size)), name="W")
+    #w_t = tf.transpose(w)
 
     #w_t = tf.Variable(tf.truncated_normal([vocab_size, size], stddev=1.0 / math.sqrt(size))) 
     #w = tf.transpose(w_t)
     
-    #b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
-    b = tf.Variable(tf.zeros([vocab_size]))
+    b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
+    #b = tf.Variable(tf.zeros([vocab_size]))
     self.logits = logits = tf.matmul(output, w) + b
    
     
@@ -280,8 +281,17 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
     for i, (c, h) in enumerate(model.initial_state):
       feed_dict[c] = state[i].c
       feed_dict[h] = state[i].h
-    
-    vals = session.run(fetches, feed_dict)
+   
+
+    try: 
+      vals = session.run(fetches, feed_dict)
+    except ValueError as e:
+      print("[ERROR] Error while running step %d (value: =\"%s\")" % (d, str(x)),
+		file=sys.stderr)
+      print("[ERROR] Aborting run_step; returning -99", file=sys.stderr)
+      print(e, file=sys.stderr)
+      return -99.0
+
     cost = vals['cost']
     state = vals['state']
     probs = vals['probs']
