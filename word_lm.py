@@ -228,14 +228,22 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
             perxplexity= exp(costs/iters)
   """
   epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
+  config = model.config
   start_time = time.time()
   costs = 0.0
-  iters = 0
-  
-  state = session.run(model.initial_state)
+  iters, skipped_iters = 0, 0
+ 
+  last_step = config.step
+  if last_step > 0:
+    state = _load_state()
+    print("Last step: %d" % last_step)
+  else: 
+    state = session.run(model.initial_state)
   predictions = []
   for step, (x, y) in enumerate(reader.iterator(data, model.batch_size,
                                                     model.num_steps)):
+    if last_step > step: skipped_iters += model.num_steps; continue
+
     fetches = {"cost": model.cost, "state": model.final_state, "probs": model.probs}
     if eval_op is not None:
       fetches["eval_op"] = eval_op
@@ -248,6 +256,8 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
       feed_dict[h] = state[i].h
    
 
+    # Catching error & returning -99 as we may need an output for each input
+    # (can't just ignore)
     try: 
       vals = session.run(fetches, feed_dict)
     except ValueError as e:
@@ -260,10 +270,10 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
     cost = vals['cost']
     state = vals['state']
     probs = vals['probs']
-    
     costs += cost
     iters += model.num_steps
     
+    # Predict mode
     if idict is not None:
       probs = probs[0]
       next_id = np.argmax(probs)
@@ -278,6 +288,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
         }
       predictions.append(prediction)
 
+    # Logging results & Saving
     if log<0 or log>100:
       log = 10
     if verbose and step % (epoch_size // log) == 1:
@@ -285,12 +296,15 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
             (step * 1.0 / epoch_size, np.exp(costs / iters),
              iters * model.batch_size / (time.time() - start_time)))
       if saver is not None:
-        spath = os.path.join(FLAGS.model_dir, "ep_%d_step_%d.ckpt" % (model.config.epoch, step))
-        print("Saving %s" % spath)
-        saver.save(session, spath)
-        model.config.step = step
-        model.config.save() 
+        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch, step))
+        _save_state(state) 
+        config.step = step
+        config.save() 
   
+
+  config.step = 0
+
+  # Perplexity and loglikes
   ppl = np.exp(costs / iters)
   ll = -costs / np.log(10)
   if not idict:
@@ -298,6 +312,21 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
     return ret
   return ppl, predictions
 
+def _save_checkpoint(saver, session, name):
+  path = os.path.join(FLAGS.model_dir, name)
+  print("Saving %s" % path)
+  saver.save(session, path)
+
+def _state_path():
+  return os.path.join(FLAGS.model_dir, "state")
+
+def _load_state():
+  with open(_state_path(), 'r') as f:
+    return pickle.load(f)
+
+def _save_state(state):
+  with open(_state_path(), 'w') as f:
+    pickle.dump(state, f)  
 
 from config import Config
 def get_config():
@@ -408,9 +437,11 @@ def main(_):
           train_perplexity = run_epoch(session, m, train_data, eval_op=m.train_op,
                                        verbose=True, saver=saver, log=FLAGS.log)
           print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+          
           valid_perplexity = run_epoch(session, mvalid, valid_data)
           print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
-
+          
+          config.step = 0
           config.epoch += 1
           config.save()
         
