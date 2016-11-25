@@ -71,7 +71,7 @@ from config import *
 import reader
 
 ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
-LOSS_FCTS = ["softmax", "nce", "sampledsoftmax", "seq", "seqex"]
+LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
 
 flags = tf.flags
 logging = tf.logging
@@ -115,17 +115,14 @@ class Model(object):
     self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
     self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
 
-    # Slightly better results can be obtained with forget gate biases
-    # initialized to 1 but the hyperparameters of the model would need to be
-    # different than reported in the paper.
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=0.0, state_is_tuple=True)
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=1.0, state_is_tuple=True)
     if is_training and config.keep_prob < 1:
       lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
           lstm_cell, output_keep_prob=config.keep_prob)
     cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * config.num_layers, state_is_tuple=True)
 
     self._initial_state = cell.zero_state(batch_size, data_type())
-
+    
     with tf.device("/cpu:0"):
       embedding = tf.get_variable(
           "embedding", [vocab_size, size], dtype=data_type())
@@ -135,36 +132,28 @@ class Model(object):
       inputs = tf.nn.dropout(inputs, config.keep_prob)
 
   
-    outputs, state = tf.nn.dynamic_rnn(cell=cell, inputs=inputs, initial_state=self._initial_state)
+    inputs = [tf.squeeze(input_, [1])
+           for input_ in tf.split(1, num_steps, inputs)]
+    outputs, state = tf.nn.rnn(cell=cell, inputs=inputs, initial_state=self._initial_state)
     
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
-    w = tf.get_variable(
-        "softmax_w", [size, vocab_size], dtype=data_type())
-    w_t = tf.transpose(w)
-    #w = tf.Variable(tf.truncated_normal([size, vocab_size], stddev=1.0 / math.sqrt(size)), name="W")
-    #w_t = tf.transpose(w)
-
-    #w_t = tf.Variable(tf.truncated_normal([vocab_size, size], stddev=1.0 / math.sqrt(size))) 
-    #w = tf.transpose(w_t)
-    
-    b = tf.get_variable("softmax_b", [vocab_size], dtype=data_type())
-    #b = tf.Variable(tf.zeros([vocab_size]))
+    w = tf.get_variable("w", [size, vocab_size], dtype=data_type())
+    b = tf.get_variable("b", [vocab_size], dtype=data_type())
     self.logits = logits = tf.matmul(output, w) + b
    
     
     if self.loss_fct == "softmax":
-      loss = tf.nn.softmax(logits)
-      #loss = tf.nn.seq2seq.sequence_loss_by_example(
-      #  [logits],
-      #  [tf.reshape(self._targets, [-1])],
-      #  [tf.ones([batch_size * num_steps], dtype=data_type())])
+      loss = tf.nn.seq2seq.sequence_loss_by_example(
+        [logits],
+        [tf.reshape(self._targets, [-1])],
+        [tf.ones([batch_size * num_steps], dtype=data_type())])
     elif self.loss_fct == "nce":
       # thx to http://stackoverflow.com/questions/38363672/train-tensorflow-language-model-with-nce-or-sampled-softmax
       
+      w_t = tf.transpose(w)
       num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
-      #w_t = tf.transpose(w)
       loss = tf.nn.nce_loss(w_t, b,                           
                             hidden,
                             labels,
@@ -180,23 +169,13 @@ class Model(object):
                                         labels, 
                                         num_samples,
                                         vocab_size)
-    elif self.loss_fct == "seq":
-      loss = tf.nn.seq2seq.sequence_loss(
-        [logits],
-        [tf.reshape(self._targets, [-1])],
-        [tf.ones([batch_size * num_steps], dtype=data_type())])
-    
-    elif self.loss_fct == "seqex":
-      loss = tf.nn.seq2seq.sequence_loss_by_example(
-        [logits],
-        [tf.reshape(self._targets, [-1])],
-        [tf.ones([batch_size * num_steps], dtype=data_type())])
 
     else:
       raise ValueError("Unsupported loss function: %s" % loss_fct) 
     self._cost = cost = tf.reduce_sum(loss) / batch_size
     self._final_state = state 
-    self.probs = tf.nn.softmax(logits)
+    self.probs = loss
+    
     if not is_training:
       return
 
