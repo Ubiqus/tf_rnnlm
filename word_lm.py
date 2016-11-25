@@ -111,6 +111,7 @@ class Model(object):
     size = config.hidden_size
     vocab_size = config.vocab_size
     self.loss_fct = loss_fct
+    self.is_training = is_training
 
     self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
     self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
@@ -137,12 +138,12 @@ class Model(object):
     outputs, state = tf.nn.rnn(cell=cell, inputs=inputs, initial_state=self._initial_state)
     
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
-    w = tf.get_variable("w", [size, vocab_size], dtype=data_type())
-    b = tf.get_variable("b", [vocab_size], dtype=data_type())
+    w_t = tf.get_variable("w", [vocab_size, size], dtype=data_type())
+    w = tf.transpose(w_t)
+    b= tf.get_variable("b", [vocab_size], dtype=data_type())
     self.logits = logits = tf.matmul(output, w) + b
-   
-    
-    if self.loss_fct == "softmax":
+
+    if not is_training or self.loss_fct == "softmax":
       loss = tf.nn.seq2seq.sequence_loss_by_example(
         [logits],
         [tf.reshape(self._targets, [-1])],
@@ -150,7 +151,6 @@ class Model(object):
     elif self.loss_fct == "nce":
       # thx to http://stackoverflow.com/questions/38363672/train-tensorflow-language-model-with-nce-or-sampled-softmax
       
-      w_t = tf.transpose(w)
       num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
@@ -160,7 +160,6 @@ class Model(object):
                             num_samples, 
                             vocab_size)
     elif self.loss_fct == "sampledsoftmax":
-      w_t = tf.transpose(w)	
       num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
@@ -233,8 +232,9 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   costs = 0.0
   iters, skipped_iters = 0, 0
  
-  last_step = config.step
-  if last_step > 0:
+  last_step = 0
+  if model.is_training and last_step > 0:
+    last_step = config.step
     state = _load_state()
     print("Last step: %d" % last_step)
   else: 
@@ -261,7 +261,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
     try: 
       vals = session.run(fetches, feed_dict)
     except ValueError as e:
-      print("[ERROR] Error while running step %d (value: =\"%s\")" % (d, str(x)),
+      print("[ERROR] Error while running step %d (value: =\"%s\")" % (step, str(x)),
 		file=sys.stderr)
       print("[ERROR] Aborting run_step; returning -99", file=sys.stderr)
       print(e, file=sys.stderr)
@@ -304,6 +304,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
 
   config.step = 0
 
+  
   # Perplexity and loglikes
   ppl = np.exp(costs / iters)
   ll = -costs / np.log(10)
