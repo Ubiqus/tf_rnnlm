@@ -20,16 +20,19 @@ class Config:
     self.__dict__.update(entries)
 
   def _get_config(self, config):       
-    if config == "small":
+    if config in ["small", "smsm", "smlg"]:
       o = small_config()
     elif config == "medium":
       o = medium_config()
-    elif config == "large":
+    elif config in ["large", "lgsm", "lglg"]:
       o = large_config()
     elif config == "test":
       o = test_config()
     else:
       raise ValueError("Invalid config: %s", config)
+
+    if config in ["smlg", "lglg"]:
+      o["vocab_size"] = 150000	
     return o
 
   def _load(self):
