@@ -104,7 +104,7 @@ def data_type():
 class Model(object):
   """The model."""
 
-  def __init__(self, is_training, config, loss_fct="softmax"):
+  def __init__(self, is_training, config, loss_fct="softmax", test_opti=False):
     self.config = config
     self.batch_size = batch_size = config.batch_size
     self.num_steps = num_steps = config.num_steps
@@ -136,34 +136,46 @@ class Model(object):
     inputs = [tf.squeeze(input_, [1])
            for input_ in tf.split(1, num_steps, inputs)]
     outputs, state = tf.nn.rnn(cell=cell, inputs=inputs, initial_state=self._initial_state)
-    
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
-    w_t = tf.get_variable("w", [vocab_size, size], dtype=data_type())
-    w = tf.transpose(w_t)
-    b= tf.get_variable("b", [vocab_size], dtype=data_type())
-    self.logits = logits = tf.matmul(output, w) + b
 
-    if not is_training or self.loss_fct == "softmax":
-      loss = tf.nn.seq2seq.sequence_loss_by_example(
-        [logits],
-        [tf.reshape(self._targets, [-1])],
-        [tf.ones([batch_size * num_steps], dtype=data_type())])
-    elif self.loss_fct == "nce":
-      # thx to http://stackoverflow.com/questions/38363672/train-tensorflow-language-model-with-nce-or-sampled-softmax
+    if test_opti:
+      # If test_opti is True we assume that the model has w_t variable 
+      # this makes a huge performance improvement (especially on large model/vocab
+      # but require model weights to be transposed.
+      # See transpose.py 
+      self.w_t = w_t = tf.get_variable("w_t", [size, vocab_size], dtype=data_type())
+      self.b = b = tf.get_variable("b", [vocab_size], dtype=data_type())
+      loss, logits = self.softmax(output, w_t, b)
+      self.logits = logits
+
+    elif not is_training or self.loss_fct == "softmax": 
+      # Regular testing using softmax and default "w" weights matrix
+      # It may be really slower than 'test_opti'
+      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
+      b = tf.get_variable("b", [vocab_size], dtype=data_type()) 
+      w_t = tf.transpose(w)
       
+      loss, logits = self.softmax(output, w_t, b)
+      self.logits = logits
+
+    elif self.loss_fct == "nce":
+      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
+      b = tf.get_variable("b", [vocab_size], dtype=data_type())
       num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
-      loss = tf.nn.nce_loss(w_t, b,                           
+      loss = tf.nn.nce_loss(w, b,                           
                             hidden,
                             labels,
                             num_samples, 
                             vocab_size)
     elif self.loss_fct == "sampledsoftmax":
+      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
+      b = tf.get_variable("b", [vocab_size], dtype=data_type())
       num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
-      loss = tf.nn.sampled_softmax_loss(w_t, b,
+      loss = tf.nn.sampled_softmax_loss(w, b,
                                         hidden, 
                                         labels, 
                                         num_samples,
@@ -194,6 +206,13 @@ class Model(object):
   def assign_lr(self, session, lr_value):
     session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
 
+  def softmax(self, output, w, b):
+    logits = tf.matmul(output, w)+b
+    loss = tf.nn.seq2seq.sequence_loss_by_example(
+        [logits],
+        [tf.reshape(self._targets, [-1])],
+        [tf.ones([self.batch_size * self.num_steps], dtype=data_type())])
+    return loss, logits
 
   @property
   def initial_state(self):
@@ -228,9 +247,8 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   """
   epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
   config = model.config
-  start_time = time.time()
   costs = 0.0
-  iters, skipped_iters = 0, 0
+  iters = 0 
  
   last_step = 0
   if model.is_training and last_step > 0:
@@ -240,11 +258,14 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   else: 
     state = session.run(model.initial_state)
   predictions = []
+  
+  start_time = time.time()
   for step, (x, y) in enumerate(reader.iterator(data, model.batch_size,
                                                     model.num_steps)):
-    if last_step > step: skipped_iters += model.num_steps; continue
+    if last_step > step: continue
 
     fetches = {"cost": model.cost, "state": model.final_state, "probs": model.probs}
+
     if eval_op is not None:
       fetches["eval_op"] = eval_op
 
@@ -378,7 +399,20 @@ def main(_):
     word_to_id = None
     config.epoch = 0
     config.step = 0
- 
+
+  # Reading fast_test. 
+  # This option is enabled by 'transpose.py'
+  fast_test = False
+  if "fast_test" in config.__dict__:
+    # Be sure to set a boolean
+    fast_test = True if config.fast_test else False
+
+  # Warning if we're slowing testing
+  if not (fast_test or train):
+    print("""\n\n[WARNING]: You are using a test feature involving 'softmax'
+               you must consider using 'fast_test' feature'""")
+    print("[WARNING]: See transpose.py for more information")
+   
   eval_config = Config(clone=config)
   eval_config.batch_size = 1
   eval_config.num_steps = 1
@@ -414,7 +448,7 @@ def main(_):
     
     with tf.name_scope("Test"):
       with tf.variable_scope("Model", reuse=train, initializer=initializer):
-        mtest = Model(is_training=False, config=eval_config)
+        mtest = Model(is_training=False, config=eval_config, test_opti=fast_test)
 
    
     saver = tf.train.Saver()
