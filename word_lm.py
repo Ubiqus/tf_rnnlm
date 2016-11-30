@@ -391,7 +391,7 @@ def main(_):
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
   if action != "train":
     #TODO Exception
-    print("Loading word_to_id: "+word_to_id_path)
+    #print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
       word_to_id = pickle.load(f)
 
@@ -485,14 +485,19 @@ def main(_):
 
         # Line by line processing (=ppl, predict, loglikes)
         if linebyline:
-          d = sys.stdin.readline()
           if predict: print("[")
           while True:
-            idict = None
+            line = sys.stdin.readline()
+            if not line: break
             
-            d = d.decode("utf-8").replace("\n", " <eos> ").split()
+            idict = None
+            d = line.decode("utf-8").replace("\n", " <eos> ").split()
             test_data = [word_to_id[word] for word in d if word in word_to_id]
-           
+          
+            if len(test_data) < 2:
+              print(-9999)
+              continue
+
             # Prediction mode
             if predict:
               inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
@@ -504,10 +509,7 @@ def main(_):
             else:
               o = run_epoch(session, mtest, test_data, loglikes=loglikes)
               print("%.3f" % o)
-            
-            d = sys.stdin.readline()
-            if not d: break
-            if len(d) < 3: print("-1"); continue
+              
 
           if predict: print("]")
 
