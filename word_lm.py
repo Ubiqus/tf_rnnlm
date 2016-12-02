@@ -109,7 +109,7 @@ class Model(object):
     self.batch_size = batch_size = config.batch_size
     self.num_steps = num_steps = config.num_steps
     size = config.hidden_size
-    vocab_size = config.vocab_size
+    self.vocab_size = vocab_size = config.vocab_size
     self.loss_fct = loss_fct
     self.is_training = is_training
 
@@ -138,6 +138,10 @@ class Model(object):
     outputs, state = tf.nn.rnn(cell=cell, inputs=inputs, initial_state=self._initial_state)
     output = tf.reshape(tf.concat(1, outputs), [-1, size])
 
+    # We are not masking loss anyway, so it is basically only ones
+    # Still may change in near future
+    mask = tf.ones([self.batch_size * self.num_steps])
+
     if test_opti:
       # If test_opti is True we assume that the model has w_t variable 
       # this makes a huge performance improvement (especially on large model/vocab
@@ -145,7 +149,7 @@ class Model(object):
       # See transpose.py 
       self.w_t = w_t = tf.get_variable("w_t", [size, vocab_size], dtype=data_type())
       self.b = b = tf.get_variable("b", [vocab_size], dtype=data_type())
-      loss, logits = self.softmax(output, w_t, b)
+      loss, logits = self.softmax(output, w_t, b, mask)
       self.logits = logits
 
     elif not is_training or self.loss_fct == "softmax": 
@@ -155,7 +159,7 @@ class Model(object):
       b = tf.get_variable("b", [vocab_size], dtype=data_type()) 
       w_t = tf.transpose(w)
       
-      loss, logits = self.softmax(output, w_t, b)
+      loss, logits = self.softmax(output, w_t, b, mask)
       self.logits = logits
 
     elif self.loss_fct == "nce":
@@ -175,11 +179,8 @@ class Model(object):
       num_samples = 64
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
-      loss = tf.nn.sampled_softmax_loss(w, b,
-                                        hidden, 
-                                        labels, 
-                                        num_samples,
-                                        vocab_size)
+      
+      loss = self.sampled_softmax(w, b, labels, hidden, num_samples, mask)
 
     else:
       raise ValueError("Unsupported loss function: %s" % loss_fct) 
@@ -206,12 +207,27 @@ class Model(object):
   def assign_lr(self, session, lr_value):
     session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
 
-  def softmax(self, output, w, b):
+  def sampled_softmax(self, w, b, labels, hidden, num_samples, mask):
+    vocab_size = self.vocab_size
+    def _loss_fct(inputs_, labels_):
+        labels_ = tf.reshape(labels_, [-1, 1])
+        return tf.nn.sampled_softmax_loss(
+            w, b, inputs_, labels_, num_samples, vocab_size)
+    
+    loss = tf.nn.seq2seq.sequence_loss_by_example(
+        [ hidden],
+        [ labels ],
+        [ mask],
+        num_samples,
+        softmax_loss_function=_loss_fct)
+    return loss
+
+  def softmax(self, output, w, b, mask):
     logits = tf.matmul(output, w)+b
     loss = tf.nn.seq2seq.sequence_loss_by_example(
         [logits],
         [tf.reshape(self._targets, [-1])],
-        [tf.ones([self.batch_size * self.num_steps], dtype=data_type())])
+        [mask])
     return loss, logits
 
   @property
