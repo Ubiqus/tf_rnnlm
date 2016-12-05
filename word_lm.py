@@ -73,6 +73,22 @@ import reader
 ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
 LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
 
+MODEL_PARAMS_INT = [
+      "max_grad_norm"
+      "num_layers",
+      "num_steps",
+      "hidden_size",
+      "max_epoch",
+      "max_max_epoch",
+      "batch_size", 
+      "vocab_size"]
+MODEL_PARAMS_FLOAT = [
+      "init_scale",
+      "learning_rate",
+      "keep_prob",
+      "lr_decay"]
+
+
 flags = tf.flags
 logging = tf.logging
 
@@ -90,6 +106,13 @@ flags.DEFINE_bool("use_fp16", False,
 
 flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
 flags.DEFINE_integer("log", 10, "How often to print information and save model: each (epoch_size/log) steps. (--log 100: each 1% --log 50: each 2%, --log 10: each 10% etc")
+
+for param in MODEL_PARAMS_INT:
+  flags.DEFINE_integer(param, None, "Manually set model %s" % param)
+for param in MODEL_PARAMS_FLOAT:
+  flags.DEFINE_float(param, None, "Manually set model %s" % param)
+MODEL_PARAMS = MODEL_PARAMS_INT + MODEL_PARAMS_FLOAT
+
 
 FLAGS = flags.FLAGS
 
@@ -368,8 +391,9 @@ def _save_state(state):
 
 from config import Config
 def get_config():
+  params = {key: FLAGS.__getattr__(key) for key in MODEL_PARAMS} 
   config_path = os.path.join(FLAGS.model_dir, "config")
-  return Config(config=FLAGS.config, path=config_path) 
+  return Config(config=FLAGS.config, path=config_path, params=params) 
 
 def _restore_session(saver, session):
   ckpt = tf.train.get_checkpoint_state(FLAGS.model_dir)

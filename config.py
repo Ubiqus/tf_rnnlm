@@ -3,7 +3,7 @@ import json
 class Config:
   """Configuration object loaded from/saved to JSON object
   """
-  def __init__(self, config=None, path=None, clone=None):
+  def __init__(self, config=None, path=None, params=[], clone=None):
 
     if clone is not None:
       self.path = clone.path
@@ -17,6 +17,10 @@ class Config:
     else:
       raise ValueError("Parameters 'config' and 'path' can't be both 'None'")
 
+    for param in params:
+      val = params[param]
+      if val is not None:
+        entries[param] = val
     self.__dict__.update(entries)
 
   def _get_config(self, config):       
