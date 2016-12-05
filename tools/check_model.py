@@ -1,3 +1,4 @@
+#!/usr/bin/env python
 """
   29 nov, 2016 - pltrdy
     
