@@ -1,6 +1,20 @@
 # Recurrent Neural Network Language Model using TensorFlow
 
-## Original Work
+## Content
+* [Original Work](#orig)
+* [Motivations](#motivations)
+* [Quickstart](#quickstart)
+* [Continue Training (--action continue)](#continue)
+* [Getting a text perplexity with regard to the LM (--action test)](#test)
+* [Line by line perplexity (--action ppl)](#ppl)
+* [Line by line loglikes (--action loglikes)](#loglikes)
+* [Line by line prediction (--action predict)](#predict)
+* [Results](#results)
+
+
+================
+
+## [Original Work](#orig)
 
 Our work is based on the [RNN LM tutorial on tensorflow.org](https://www.tensorflow.org/versions/r0.11/tutorials/recurrent/index.html#recurrent-neural-networks) following the paper from [Zaremba et al., 2014](https://arxiv.org/abs/1409.2329).
 
@@ -13,14 +27,14 @@ The tutorial uses the PTB dataset ([tgz](http://www.fit.vutbr.cz/~imikolov/rnnlm
 - [Benoit Favre's tf rnn lm](https://gitlab.lif.univ-mrs.fr/benoit.favre/tf_lm/blob/200645ab5aa446b72cf30c14355126062070f676/tf_lm.py)
 
 
-## Motivations
+## [Motivations](#motivations)
 * Getting started with TensorFlow
 * Make RNN LM manipulation easy in practice (easily look/edit configs, cancel/resume training, multiple outputs...)
 * Train RNN LM for ASR using Kaldi (especially using `loglikes` mode)
 
-## Quickstart
+## [Quickstart](#quickstart)
 
-```
+```shell
 git clone https://github.com/pltrdy/tf_rnnlm
 cd tf_rnnlm
 python word_lm.py --help
@@ -29,18 +43,18 @@ python word_lm.py --help
 **Note** that `word_lm.py` imports `reader.py` not `tensorflow.models.rnn.ptb` (i.e. it does not use your tensorflow installation). It is therefore compatible with tensorflow r0.11c as long as you don't use `word_lm.py` alone. 
 
 **Downloading PTB dataset:**
-```
-chmod +x get_ptb.sh
-./get_ptb.sh
+```shell
+chmod +x tools/get_ptb.sh
+./tools/get_ptb.sh
 ```
 
 **Training small model:**
-```
+```shell
 mkdir small_model
 python word_lm.py --action train --data_path ./simple-examples/data --model_dir=./small_model --config small
 ```
 **Training custom model:**
-```
+```shell
 mkdir custom_model
 
 # Generating new config file
@@ -57,37 +71,37 @@ python word_lm.py --action train --data_path=./simple-examples/data --model_dir=
 ```
 **note:** data files are expected to be called `train.txt`, `test.txt` and `valid.txt`. Note that `get_ptb.sh` creates symlinks for that purpose
 
-## Continue Training (--action continue) 
+## [Continue Training (--action continue)](#continue)
 One can continue an interrupted training with the following command:
-```
+```shell
 python word_lm.py --action continue --data_path=./simple-examples/data --model_dir=./model
 ```
 Where `./model` must contain `config`, `word_to_id`, `checkpoint` and the corresponding `.cktp` files.
 
-## Getting a text perplexity with regard to the LM (--action test)
-```
+## [Getting a text perplexity with regard to the LM (--action test)](#test)
+```shell
 # Compute and outputs the perplexity of ./simple-examples/data/test.txt using LM in ./model
 python word_lm.py --action test --data_path=./simple-examples/data --model_dir=./model
 ```
 
-## Line by line perplexity (--action ppl)
+## [Line by line perplexity (--action ppl)](#ppl)
 Running the model on each `stdin` line and returning its perplexity (precisely 'per-word perplexity' i.e. `exp(costs/iters)`
-```
+```shell
 cat ./data/test.txt | python word_lm.py --action ppl --model_dir=./model
 ```
 
 
-## Line by line loglikes (--action loglikes)
+## [Line by line loglikes (--action loglikes)](#loglikes)
 Running the model on each `stdin` line and returning its 'loglikes' (i.e. `-costs/log(10)`).
 
 **Note:** in particular, it is meant to be used for Kaldi's rescoring.
-```
+```shell
 cat ./data/test.txt | python word_lm.py --action loglikes --model_dir=./model
 ```
 
-## Line by line prediction (--action predict)
+## [Line by line prediction (--action predict)](#predict)
 Running the model on each `stdin` line and prints a prediction informations
-```
+```shell
 cat ./data/test.txt | python word_lm.py --action ppl --model_dir=./model
 ```
 It will print a json object with the following structure:
@@ -99,7 +113,7 @@ It will print a json object with the following structure:
   + pred_word: predicted word
   + pred_prob: probability associated with the predicted word
 
-## Results
+## [Results](#results)
 
 Quoting [tensorflow.models.rnn.ptb.ptb_word_lm.py:22](https://github.com/tensorflow/tensorflow/blob/e2d51a87f0727f8537b46048d8241aeebb6e48d6/tensorflow/models/rnn/ptb/ptb_word_lm.py#L22):
 > There are 3 supported model configurations:
