@@ -10,3 +10,5 @@ tar -xzf simple-examples.tgz
 cd simple-examples/data
 for f in ptb.*; do ln -s "$f"  "$(echo "$f" | cut -c 5-)"; done;
 cd ../..
+
+ln -s simple-examples/data data
