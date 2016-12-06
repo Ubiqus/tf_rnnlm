@@ -406,6 +406,7 @@ def _restore_session(saver, session):
 
 import os
 import pickle
+import util
 def main(_):
   assert(FLAGS.action in ACTIONS)
   assert(FLAGS.loss in LOSS_FCTS)
@@ -421,7 +422,7 @@ def main(_):
   test = action == "test"
   #print("Action: "+action)
 
-
+  util.mkdirs(FLAGS.model_dir)
 
   if not (FLAGS.data_path or linebyline):
     raise ValueError("Must set --data_path to data directory")
@@ -454,8 +455,8 @@ def main(_):
     print("[WARNING]: See transpose.py for more information")
    
   eval_config = Config(clone=config)
-  eval_config.batch_size = 1
-  eval_config.num_steps = 1
+  #eval_config.batch_size = 2
+  #eval_config.num_steps = 10
 
 
   #print(config.__dict__)

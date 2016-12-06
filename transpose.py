@@ -32,6 +32,7 @@ import numpy as np
 import tensorflow as tf
 from config import *
 import os
+import util 
 
 flags = tf.flags
 
@@ -65,7 +66,8 @@ def _restore_session(saver, session):
 def main(_):
   assert(FLAGS.src is not None)
   assert(FLAGS.dst is not None)
-  
+
+  util.mkdirs(FLAGS.dst)  
 
   src_config = get_config()
   config = Config(clone=src_config)
