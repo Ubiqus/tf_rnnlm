@@ -291,9 +291,8 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   costs = 0.0
   iters = 0 
  
-  last_step = 0
+  last_step = config.step
   if model.is_training and last_step > 0:
-    last_step = config.step
     state = _load_state()
     print("Last step: %d" % last_step)
   else: 
@@ -358,7 +357,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
             (step * 1.0 / epoch_size, np.exp(costs / iters),
              iters * model.batch_size / (time.time() - start_time)))
       if saver is not None:
-        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch, step))
+        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch+1, step))
         _save_state(state) 
         config.step = step
         config.save() 
@@ -422,7 +421,6 @@ def main(_):
   predict = action == "predict"
   linebyline = ppl or loglikes or predict
   test = action == "test"
-  #print("Action: "+action)
 
   util.mkdirs(FLAGS.model_dir)
 
@@ -433,8 +431,6 @@ def main(_):
 
   word_to_id_path = os.path.join(FLAGS.model_dir, "word_to_id")
   if action != "train":
-    #TODO Exception
-    #print("Loading word_to_id: "+word_to_id_path)
     with open(word_to_id_path, 'r') as f:
       word_to_id = pickle.load(f)
 
@@ -457,12 +453,6 @@ def main(_):
     print("[WARNING]: See transpose.py for more information")
    
   eval_config = Config(clone=config)
-  #eval_config.batch_size = 2
-  #eval_config.num_steps = 10
-
-
-  #print(config.__dict__)
-  #print(config.vocab_size)
 
   # Load data
   if not linebyline:
