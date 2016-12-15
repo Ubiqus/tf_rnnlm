@@ -8,7 +8,7 @@
 # tools/tune_batchsize_tr.sh
 #
 
-DATA_PATH="./simple-examples/data"
+DATA_PATH="./data"
 MODEL_ROOT="./batchsize_tuning"
 
 # We'll use a model with 20 batch_size

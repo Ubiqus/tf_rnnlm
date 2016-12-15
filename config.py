@@ -30,8 +30,6 @@ class Config:
       o = medium_config()
     elif config in ["large", "lgsm", "lglg"]:
       o = large_config()
-    elif config == "test":
-      o = test_config()
     else:
       raise ValueError("Invalid config: %s", config)
 
@@ -63,7 +61,8 @@ def small_config():
     "keep_prob" : 1.0,
     "lr_decay" : 0.5,
     "batch_size" : 20,
-    "vocab_size" : 10000
+    "vocab_size" : 10000,
+    "num_samples": 1024,
     }
 
 
@@ -82,6 +81,7 @@ def medium_config():
       "lr_decay" : 0.8,
       "batch_size" : 20,
       "vocab_size" : 10000,
+      "num_samples": 1024,
     }
 
 def large_config():
@@ -99,22 +99,5 @@ def large_config():
       "lr_decay" : 1 / 1.15,
       "batch_size" : 20,
       "vocab_size" : 10000,
-    }
-
-
-def test_config():
-  """Tiny config, for testing."""
-  return {
-    "init_scale" : 0.1,
-    "learning_rate" : 1.0,
-    "max_grad_norm" : 1,
-    "num_layers" : 1,
-    "num_steps" : 2,
-    "hidden_size" : 2,
-    "max_epoch" : 1,
-    "max_max_epoch" : 1,
-    "keep_prob" : 1.0,
-    "lr_decay" : 0.5,
-    "batch_size" : 20,
-    "vocab_size" : 10000,
+      "num_samples": 1024,
     }

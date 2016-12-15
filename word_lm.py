@@ -35,7 +35,7 @@ The hyperparameters used in the model:
 - learning_rate - the initial value of the learning rate
 - max_grad_norm - the maximum permissible norm of the gradient
 - num_layers - the number of LSTM layers
-- num_steps - the number of unrolled steps of LSTM
+- (obsolete with dynamic) num_steps - the number of unrolled steps of LSTM
 - hidden_size - the number of LSTM units
 - max_epoch - the number of epochs trained with the initial learning rate
 - max_max_epoch - the total number of epochs for training
@@ -65,11 +65,9 @@ import json
 import numpy as np
 import tensorflow as tf
 import sys
-# We put config in a separate file so that loading a config object does (using pickle)
-# import this file twice (which triggers error)
-from config import *
 
-# Using our custom reader
+from config import *
+from model import Model
 import reader
 
 ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
@@ -78,12 +76,12 @@ LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
 MODEL_PARAMS_INT = [
       "max_grad_norm"
       "num_layers",
-      "num_steps",
       "hidden_size",
       "max_epoch",
       "max_max_epoch",
       "batch_size", 
-      "vocab_size"]
+      "vocab_size",
+      "num_samples"]
 MODEL_PARAMS_FLOAT = [
       "init_scale",
       "learning_rate",
@@ -107,7 +105,9 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
-flags.DEFINE_integer("log", 10, "How often to print information and save model: each (epoch_size/log) steps. (--log 100: each 1% --log 50: each 2%, --log 10: each 10% etc")
+flags.DEFINE_integer("save_rate", None, "How often to print information and save model (%% of epoch)")
+
+flags.DEFINE_integer("log_rate", 10, "How often to print information and save model (%% of epoch)")
 
 for param in MODEL_PARAMS_INT:
   flags.DEFINE_integer(param, None, "Manually set model %s" % param)
@@ -116,167 +116,15 @@ for param in MODEL_PARAMS_FLOAT:
 MODEL_PARAMS = MODEL_PARAMS_INT + MODEL_PARAMS_FLOAT
 
 
-FLAGS = flags.FLAGS
 
+FLAGS = flags.FLAGS
 
 def data_type():
   return tf.float16 if FLAGS.use_fp16 else tf.float32
 
 
-
-
-
-class Model(object):
-  """The model."""
-
-  def __init__(self, is_training, config, loss_fct="softmax", test_opti=False):
-    self.config = config
-    self.batch_size = batch_size = config.batch_size
-    self.num_steps = num_steps = config.num_steps
-    size = config.hidden_size
-    self.vocab_size = vocab_size = config.vocab_size
-    self.loss_fct = loss_fct
-    self.is_training = is_training
-
-    self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
-    self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
-
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=1.0, state_is_tuple=True)
-    if is_training and config.keep_prob < 1:
-      lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
-          lstm_cell, output_keep_prob=config.keep_prob)
-    cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * config.num_layers, state_is_tuple=True)
-
-    self._initial_state = cell.zero_state(batch_size, data_type())
-    
-    with tf.device("/cpu:0"):
-      embedding = tf.get_variable(
-          "embedding", [vocab_size, size], dtype=data_type())
-      inputs = tf.nn.embedding_lookup(embedding, self._input_data)
-
-    if is_training and config.keep_prob < 1:
-      inputs = tf.nn.dropout(inputs, config.keep_prob)
-
-  
-    inputs = [tf.squeeze(input_, [1])
-           for input_ in tf.split(1, num_steps, inputs)]
-    outputs, state = tf.nn.rnn(cell=cell, inputs=inputs, initial_state=self._initial_state)
-    output = tf.reshape(tf.concat(1, outputs), [-1, size])
-
-    # We are not masking loss anyway, so it is basically only ones
-    # Still may change in near future
-    mask = tf.ones([self.batch_size * self.num_steps])
-
-    if test_opti:
-      # If test_opti is True we assume that the model has w_t variable 
-      # this makes a huge performance improvement (especially on large model/vocab
-      # but require model weights to be transposed.
-      # See transpose.py 
-      self.w_t = w_t = tf.get_variable("w_t", [size, vocab_size], dtype=data_type())
-      self.b = b = tf.get_variable("b", [vocab_size], dtype=data_type())
-      loss, logits = self.softmax(output, w_t, b, mask)
-      self.logits = logits
-
-    elif not is_training or self.loss_fct == "softmax": 
-      # Regular testing using softmax and default "w" weights matrix
-      # It may be really slower than 'test_opti'
-      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
-      b = tf.get_variable("b", [vocab_size], dtype=data_type()) 
-      w_t = tf.transpose(w)
-      
-      loss, logits = self.softmax(output, w_t, b, mask)
-      self.logits = logits
-
-    elif self.loss_fct == "nce":
-      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
-      b = tf.get_variable("b", [vocab_size], dtype=data_type())
-      num_samples = 64
-      labels = tf.reshape(self._targets, [-1,1])
-      hidden = output
-      loss = tf.nn.nce_loss(w, b,                           
-                            hidden,
-                            labels,
-                            num_samples, 
-                            vocab_size)
-    elif self.loss_fct == "sampledsoftmax":
-      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
-      b = tf.get_variable("b", [vocab_size], dtype=data_type())
-      num_samples = 64
-      labels = tf.reshape(self._targets, [-1,1])
-      hidden = output
-      
-      loss = self.sampled_softmax(w, b, labels, hidden, num_samples, mask)
-
-    else:
-      raise ValueError("Unsupported loss function: %s" % loss_fct) 
-    self._cost = cost = tf.reduce_sum(loss) / batch_size
-    self._final_state = state 
-    self.probs = loss
-    
-    if not is_training:
-      return
-
-    self._lr = tf.Variable(0.0, trainable=False)
-    tvars = tf.trainable_variables()
-    grads, _ = tf.clip_by_global_norm(tf.gradients(cost, tvars),
-                                      config.max_grad_norm)
-    optimizer = tf.train.GradientDescentOptimizer(self._lr)
-    self._train_op = optimizer.apply_gradients(
-        zip(grads, tvars),
-        global_step=tf.contrib.framework.get_or_create_global_step())
-
-    self._new_lr = tf.placeholder(
-        tf.float32, shape=[], name="new_learning_rate")
-    self._lr_update = tf.assign(self._lr, self._new_lr)
-
-  def assign_lr(self, session, lr_value):
-    session.run(self._lr_update, feed_dict={self._new_lr: lr_value})
-
-  def sampled_softmax(self, w, b, labels, hidden, num_samples, mask):
-    vocab_size = self.vocab_size
-    def _loss_fct(inputs_, labels_):
-        labels_ = tf.reshape(labels_, [-1, 1])
-        return tf.nn.sampled_softmax_loss(
-            w, b, inputs_, labels_, num_samples, vocab_size)
-    
-    loss = tf.nn.seq2seq.sequence_loss_by_example(
-        [ hidden],
-        [ labels ],
-        [ mask],
-        num_samples,
-        softmax_loss_function=_loss_fct)
-    return loss
-
-  def softmax(self, output, w, b, mask):
-    logits = tf.matmul(output, w)+b
-    loss = tf.nn.seq2seq.sequence_loss_by_example(
-        [logits],
-        [tf.reshape(self._targets, [-1])],
-        [mask])
-    return loss, logits
-
-  @property
-  def initial_state(self):
-    return self._initial_state
-
-  @property
-  def cost(self):
-    return self._cost
-
-  @property
-  def final_state(self):
-    return self._final_state
-
-  @property
-  def lr(self):
-    return self._lr
-
-  @property
-  def train_op(self):
-    return self._train_op
-
-
-def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, saver=None, loglikes=False, log=10):
+def run_epoch(session, model, data, eval_op=None, verbose=False, 
+  idict=None, saver=None, loglikes=False, log_rate=10, save_rate=50):
   """Runs the model on the given data.
       Returns:
         - if idict is set (prediction mode):
@@ -286,10 +134,17 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
         - else:
             perxplexity= exp(costs/iters)
   """
-  epoch_size = ((len(data) // model.batch_size) - 1) // model.num_steps
+  is_pos_int = lambda x: x == int(max(0, x))
+  if is_pos_int(log_rate) and is_pos_int(save_rate):
+    ValueError("log_rate and save_rate must be positive integer")
+  
+  epoch_size = ((len(data.data) // model.batch_size) - 1)
+  if not epoch_size > 1:
+    ValueError("Epoch_size must be higher than 0. Decrease 'batch_size'") 
+
   config = model.config
   costs = 0.0
-  iters = 0 
+  iters = 0
  
   last_step = config.step
   if model.is_training and last_step > 0:
@@ -300,18 +155,22 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   predictions = []
   
   start_time = time.time()
-  for step, (x, y) in enumerate(reader.iterator(data, model.batch_size,
-                                                    model.num_steps)):
+  for step, (x, y) in enumerate(data.batch_iterator()):
     if last_step > step: continue
 
-    fetches = {"cost": model.cost, "state": model.final_state, "probs": model.probs}
-
+    fetches = {
+      "cost": model.cost, 
+      "state": model.final_state, 
+      "loss": model.loss,
+      "seq_len": model.seq_len
+      }
+    
     if eval_op is not None:
       fetches["eval_op"] = eval_op
 
     feed_dict = {}
-    feed_dict[model._input_data] = x
-    feed_dict[model._targets] = y
+    feed_dict[model.inputs] = x
+    feed_dict[model.targets] = y
     for i, (c, h) in enumerate(model.initial_state):
       feed_dict[c] = state[i].c
       feed_dict[h] = state[i].h
@@ -326,17 +185,19 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
 		file=sys.stderr)
       print("[ERROR] Aborting run_step; returning -99", file=sys.stderr)
       print(e, file=sys.stderr)
+      print("x & y shapes: "+str(x.shape)+" "+str(y.shape))
       return -99.0
 
     cost = vals['cost']
     state = vals['state']
-    probs = vals['probs']
-    costs += cost
-    iters += model.num_steps
-    
+    loss = vals['loss']
+    costs += np.sum(loss)
+    seq_len = vals['seq_len']
+    iters += np.sum(seq_len)
+
     # Predict mode
     if idict is not None:
-      probs = probs[0]
+      probs = loss[0]
       next_id = np.argmax(probs)
       xx = x[0][0]
       yy = y[0][0]
@@ -349,26 +210,36 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
         }
       predictions.append(prediction)
 
-    # Logging results & Saving
-    if log<0 or log>100:
-      log = 10
-    if verbose and step % (epoch_size // log) == 1:
-      print("%.3f perplexity: %.3f speed: %.0f wps" %
-            (step * 1.0 / epoch_size, np.exp(costs / iters),
-             iters * model.batch_size / (time.time() - start_time)))
-      if saver is not None:
+
+    ppl = np.exp(costs / iters)
+    wps = iters / (time.time() - start_time)
+    epoch_percent = (step * 1.0 / epoch_size) * 100
+    log_step = epoch_size // (log_rate+1)
+    save_step = epoch_size // (save_rate+1)
+    
+    if step>0 and step<epoch_size: 
+      if verbose and step % log_step == 0:
+        print("[Epoch %d | Step: %d/%d(%.0f%%)]" % (config.epoch+1,step, epoch_size, 
+                                                  epoch_percent)
+          +"\tTraining Perplexity: %.3f" % ppl
+          +"\tSpeed: %.0f wps" % wps)
+        sys.stdout.flush()
+
+      if saver is not None and step % save_step == 0:
+        print("[Epoch %d | Step: %d/%d(%.0f%%)]\t" % (config.epoch+1,step, epoch_size,
+                                                   epoch_percent),end="")
+
         _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch+1, step))
         _save_state(state) 
         config.step = step
         config.save() 
-  
-
+  # Reseting step at end of epoch
   config.step = 0
-
   
   # Perplexity and loglikes
   ppl = np.exp(costs / iters)
   ll = -costs / np.log(10)
+
   if not idict:
     ret = ll if loglikes else ppl  
     return ret
@@ -422,6 +293,11 @@ def main(_):
   linebyline = ppl or loglikes or predict
   test = action == "test"
 
+  log_rate = FLAGS.log_rate
+  save_rate = FLAGS.save_rate
+  if save_rate is None:
+    save_rate = log_rate
+
   util.mkdirs(FLAGS.model_dir)
 
   if not (FLAGS.data_path or linebyline):
@@ -445,19 +321,24 @@ def main(_):
   if "fast_test" in config.__dict__:
     # Be sure to set a boolean
     fast_test = True if config.fast_test else False
-
   # Warning if we're slowing testing
   if not (fast_test or train):
     print("""\n\n[WARNING]: You are using a test feature involving 'softmax'
                you must consider using 'fast_test' feature'""")
     print("[WARNING]: See transpose.py for more information")
    
+  config.fast_test = fast_test
+  
   eval_config = Config(clone=config)
 
   # Load data
   if not linebyline:
-    raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
-    train_data, valid_data, test_data, word_to_id = raw_data
+    #raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
+    #train_data, valid_data, test_data, word_to_id = raw_dat
+    from dataset import Datasets
+    data = Datasets(FLAGS.data_path, training=train, word_to_id=word_to_id, batch_size=config.batch_size)
+    word_to_id = data.word_to_id
+  
   with tf.Graph().as_default():
     initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
@@ -470,18 +351,18 @@ def main(_):
 
       with tf.name_scope("Train"):
         with tf.variable_scope("Model", reuse=False, initializer=initializer):
-          m = Model(is_training=True, config=config, loss_fct=loss_fct)
+          m = Model(config=config, is_training=True, loss_fct=loss_fct)
         tf.scalar_summary("Training Loss", m.cost)
         tf.scalar_summary("Learning Rate", m.lr)
       
       with tf.name_scope("Valid"):
         with tf.variable_scope("Model", reuse=True, initializer=initializer):
-          mvalid = Model(is_training=False, config=config)
+          mvalid = Model(config=config, is_training=False)
         tf.scalar_summary("Validation Loss", mvalid.cost)
     
     with tf.name_scope("Test"):
       with tf.variable_scope("Model", reuse=train, initializer=initializer):
-        mtest = Model(is_training=False, config=eval_config, test_opti=fast_test)
+        mtest = Model(config=eval_config, is_training=False, test_opti=fast_test)
 
    
     saver = tf.train.Saver()
@@ -501,17 +382,24 @@ def main(_):
           lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
           m.assign_lr(session, config.learning_rate * lr_decay)
 
-          print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
-          train_perplexity = run_epoch(session, m, train_data, eval_op=m.train_op,
-                                       verbose=True, saver=saver, log=FLAGS.log)
+          print("\nEpoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
+          train_perplexity = run_epoch(session, m, 
+            data.train, 
+            eval_op=m.train_op,
+            verbose=True, 
+            saver=saver, 
+            log_rate=log_rate, 
+            save_rate=save_rate)
           print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
           
-          valid_perplexity = run_epoch(session, mvalid, valid_data)
+          valid_perplexity = run_epoch(session, mvalid, data.valid)
           print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
           
           config.step = 0
           config.epoch += 1
           config.save()
+
+          _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch+1, 0))
         
       else:
         session = _restore_session(saver, session)
@@ -548,7 +436,7 @@ def main(_):
 
           # Whole text processing
         elif test:
-          test_perplexity = run_epoch(session, mtest, test_data)
+          test_perplexity = run_epoch(session, mtest, data.test)
           print("Test Perplexity: %.3f" % test_perplexity)   
                     
 if __name__ == "__main__":

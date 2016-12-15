@@ -14,4 +14,4 @@ CONFIG='smlg'
 # Generating the "new" model (with transposed weights)
 mkdir -p $MODEL_DIR
 
-time python word_lm.py --action train --data_path $DATA_PATH --model_dir $MODEL_DIR --config $CONFIG --loss $LOSS --log $LOG
+time python word_lm.py --action train --data_path $DATA_PATH --model_dir $MODEL_DIR --config $CONFIG --loss $LOSS --log_rate $LOG

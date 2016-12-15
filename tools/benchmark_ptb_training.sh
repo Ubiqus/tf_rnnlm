@@ -1,6 +1,6 @@
 #!/bin/bash
 
-DATA_PATH="./simple-examples/data"
+DATA_PATH="./data"
 MODEL_ROOT="./ptb_models"
 LOSS="sampledsoftmax"
 LOG=5
@@ -34,7 +34,7 @@ train() {
   model_dir="--model_dir $MODEL_ROOT/$1"
   config="--config $1" 
   loss="--loss $LOSS"
-  log="--log $LOG"
+  log="--log_rate $LOG"
 
   echo " python word_lm.py --action train $data_path $model_dir $config $loss $log"
 }

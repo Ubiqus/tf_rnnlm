@@ -114,7 +114,8 @@ It will print a json object with the following structure:
   + pred_prob: probability associated with the predicted word
 
 ## [Results](#results)
-
+Configuration `small` `medium` and `large` are defined in `config.py` and are the same as in [tensorflow.models.rnn.ptb.ptb_word_lm.py:200](https://github.com/tensorflow/tensorflow/blob/e2d51a87f0727f8537b46048d8241aeebb6e48d6/tensorflow/models/rnn/ptb/ptb_word_lm.py#L200)
+### Baseline
 Quoting [tensorflow.models.rnn.ptb.ptb_word_lm.py:22](https://github.com/tensorflow/tensorflow/blob/e2d51a87f0727f8537b46048d8241aeebb6e48d6/tensorflow/models/rnn/ptb/ptb_word_lm.py#L22):
 > There are 3 supported model configurations:
 > 
@@ -124,3 +125,24 @@ Quoting [tensorflow.models.rnn.ptb.ptb_word_lm.py:22](https://github.com/tensorf
 > | medium | 39     | 48.45 |  86.16 |  82.07|
 > | large  | 55     | 37.87 |  82.62 |  78.29|
 > The exact results may vary depending on the random initialization.
+
+### Our RNN LM working on sentences (see [docs/dynamic.md](docs/dynamic.md))
+(based on commit [8ab3...d817](https://github.com/pltrdy/tf_rnnlm/tree/8ab3fbb790ddbdce15f1a553fc1e10cc0966d817), training using `sampledsoftmax` loss function, `num_samples=1024` and `batch_size=64`; 1x GPU GTX1080)
+
+
+| config | epochs | train | valid  | test  |  speed   | training_time | testing time |
+|--------|--------|-------|--------|-------|----------|---------------|--------------|
+| small  | 13     | 29.06 | 96.84  | 94.13 | ~36kWPS  |    6m21s      |     27s      |
+| medium | 39     | 24.61 |  75.35 | 72.83 | ~11kWPS  |    59m7s      |     28s      |
+| large  | 55     | 15.23 |  72.8  | 69.80 |  ~4kWPS  |    224m23s    |     1m5s     |
+
+**kWPS:** processing speed, i.e. thousands word per seconds.    
+**Reported time** are `real` times (see [What do 'real', 'user' and 'sys' mean in the output of time(1)?](http://stackoverflow.com/a/556411/5903959)   
+**Testing** is done using softmax on transposed weights. ([docs/transpose.md](docs/dynamic.md)) 
+**For faster results** increasing `batch_size` should speed up the process, with a small perplexity increase as a side effect and an increased GPU Memory consumption. (which can fire Out Of Memory exception)
+
+## Contributing
+Please do!   
+**Fork** the repo -> **edit** the code -> **commit** with descriptive commit message -> open a **pull request**   
+You can also open an issue for any discussion about bugs, performance or results.   
+Please also share your results with us! (see [sharing your results](docs/share_results.md))
