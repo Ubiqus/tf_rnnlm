@@ -40,20 +40,21 @@ cd tf_rnnlm
 python word_lm.py --help
 ```
 
-**Note** that `word_lm.py` imports `reader.py` not `tensorflow.models.rnn.ptb` (i.e. it does not use your tensorflow installation). It is therefore compatible with tensorflow r0.11c as long as you don't use `word_lm.py` alone. 
 
 **Downloading PTB dataset:**
 ```shell
-chmod +x tools/get_ptb.sh
 ./tools/get_ptb.sh
 ```
 
 **Training small model:**
 ```shell
-mkdir small_model
+./tools/train.sh
+
+# (is quite equal to:)
 python word_lm.py --action train --data_path ./simple-examples/data --model_dir=./small_model --config small
 ```
-**Training custom model:**
+**Training custom model:**   
+
 ```shell
 mkdir custom_model
 
@@ -69,6 +70,9 @@ vi custom_model/config
 # These files must be present.
 python word_lm.py --action train --data_path=./simple-examples/data --model_dir=./custom_model
 ```
+You can also use command line option to overwrite configuration parameters directly e.g. `--batch_size 128`, `--max_max_epoch 30` etc. (see `./word_lm.py --help`) 
+
+
 **note:** data files are expected to be called `train.txt`, `test.txt` and `valid.txt`. Note that `get_ptb.sh` creates symlinks for that purpose
 
 ## [Continue Training (--action continue)](#continue)
