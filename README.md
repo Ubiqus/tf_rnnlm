@@ -127,7 +127,7 @@ Quoting [tensorflow.models.rnn.ptb.ptb_word_lm.py:22](https://github.com/tensorf
 > The exact results may vary depending on the random initialization.
 
 ### Our RNN LM working on sentences (see [docs/dynamic.md](docs/dynamic.md))
-(based on commit [8ab3...d817](https://github.com/pltrdy/tf_rnnlm/tree/8ab3fbb790ddbdce15f1a553fc1e10cc0966d817), training using `sampledsoftmax` loss function, `num_samples=1024` and `batch_size=64`; 1x GPU GTX1080)
+(based on commit [fff...f5d6](https://github.com/pltrdy/tf_rnnlm/commit/fff44942340b1881f1ebbb3be72044da41b8f5d6), training using `sampledsoftmax` loss function, `num_samples=1024` and `batch_size=64`; 1x GPU GTX1080)
 
 
 | config | epochs | train | valid  | test  |  speed   | training_time | testing time |
@@ -138,7 +138,7 @@ Quoting [tensorflow.models.rnn.ptb.ptb_word_lm.py:22](https://github.com/tensorf
 
 **kWPS:** processing speed, i.e. thousands word per seconds.    
 **Reported time** are `real` times (see [What do 'real', 'user' and 'sys' mean in the output of time(1)?](http://stackoverflow.com/a/556411/5903959)   
-**Testing** is done using softmax on transposed weights. ([docs/transpose.md](docs/dynamic.md)) 
+**Testing** is done using softmax on transposed weights. ([docs/transpose.md](docs/dynamic.md))    
 **For faster results** increasing `batch_size` should speed up the process, with a small perplexity increase as a side effect and an increased GPU Memory consumption. (which can fire Out Of Memory exception)
 
 ## Contributing
