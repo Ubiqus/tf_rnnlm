@@ -71,6 +71,13 @@ python word_lm.py --action train --data_path=./simple-examples/data --model_dir=
 ```
 **note:** data files are expected to be called `train.txt`, `test.txt` and `valid.txt`. Note that `get_ptb.sh` creates symlinks for that purpose
 
+## Training all models and reporting results
+```shell
+./run.sh
+```
+Yes, that's all. It will train `small`, `medium` and `large` then generate a report like [this](results/template.md) using [report.sh](../tools/report.sh).   
+**Feel free to share the report with us!**
+
 ## [Continue Training (--action continue)](#continue)
 One can continue an interrupted training with the following command:
 ```shell
