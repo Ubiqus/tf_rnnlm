@@ -1,11 +1,11 @@
 **note** that such a result report can be generated using [tools/report.sh](../tools/report.sh)
 
 ## About
- * **User**: [<username>](https://github.com/<username>)
+ * **User**: [\[username\]](https://github.com/<username>)
  * **Date**: YYYY-MM-DD
- * **Commit**: [<commit comment (1rst line)> <commit hash (first 7 chars)>](https://github.com/pltrdy/tf_rnnlm/commit/<commit hash>)
- * **Dataset**: <dataset description>
- * **Hardware**: <hardware description>
+ * **Commit**: [\[commit message (1rst line)\] \[commit hash (first 7 chars)\]](https://github.com/pltrdy/tf_rnnlm/commit/<commit hash>)
+ * **Dataset**: \[dataset description\]
+ * **Hardware**: \[hardware description\]
 
 ## small
 *(show the different config (json) involved, examples below are `--config [small|medium|large] --batch_size 64`)*
@@ -80,4 +80,4 @@
 |medium||||||
 |large||||||
 
-(format number like %.3f, time in min/sec like: *xx*m*yy.zzz*sec)
+(format number like %.3f, time in min/sec like: xx**m**yy.zzz**sec**)
