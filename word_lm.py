@@ -291,8 +291,8 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
   costs = 0.0
   iters = 0 
  
-  last_step = config.step
-  if model.is_training and last_step > 0:
+  last_step = config.step if model.is_training else 0
+  if last_step > 0:
     state = _load_state()
     print("Last step: %d" % last_step)
   else: 
