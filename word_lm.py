@@ -141,7 +141,7 @@ class Model(object):
     self._input_data = tf.placeholder(tf.int32, [batch_size, num_steps])
     self._targets = tf.placeholder(tf.int32, [batch_size, num_steps])
 
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=1.0, state_is_tuple=True)
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=0.0, state_is_tuple=True)
     if is_training and config.keep_prob < 1:
       lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
           lstm_cell, output_keep_prob=config.keep_prob)
@@ -201,7 +201,7 @@ class Model(object):
     elif self.loss_fct == "sampledsoftmax":
       w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
       b = tf.get_variable("b", [vocab_size], dtype=data_type())
-      num_samples = 64
+      num_samples = 1024
       labels = tf.reshape(self._targets, [-1,1])
       hidden = output
       
