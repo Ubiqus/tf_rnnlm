@@ -32,8 +32,16 @@ import collections
 import os
 import numpy as np
 import tensorflow as tf
-EOS = "<eos>"  
+
+# Don't change those values. I would have serious side effects on the model. 
+EOS = "<eos>"
+IEOS=2
+
+BOS = "<bos>"
+IBOS=1
+
 PAD = "<pad>"
+IPAD=0
 
 def _read_words(filename):
   with tf.gfile.GFile(filename, "r") as f:
@@ -49,9 +57,10 @@ def _build_vocab(filename):
   words, _ = list(zip(*count_pairs))
   words = list(words)
   words.remove(EOS)
-  word_to_id = dict(zip(words, range(2,len(words)+2)))
-  word_to_id[EOS] = 1
-  word_to_id[PAD] = 0
+  word_to_id = dict(zip(words, range(3,len(words)+3)))
+  word_to_id[BOS] = IBOS
+  word_to_id[EOS] = IEOS
+  word_to_id[PAD] = IPAD
   return word_to_id
 
 

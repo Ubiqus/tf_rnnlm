@@ -330,6 +330,7 @@ def main(_):
   config.fast_test = fast_test
   
   eval_config = Config(clone=config)
+  eval_config.batch_size=1
 
   # Load data
   if not linebyline:

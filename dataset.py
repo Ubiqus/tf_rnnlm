@@ -9,7 +9,12 @@
 import numpy as np
 
 import reader
-EOS = reader.EOS
+IEOS = reader.IEOS
+IBOS = reader.IBOS
+IPAD = reader.IPAD
+
+# Cut sentences after MAX_LEN words
+MAX_LEN = 80
 
 class SentenceSet:
   """
@@ -17,18 +22,9 @@ class SentenceSet:
     i.e. train, valid & text sets
   """
   def __init__(self, sentences, max_len, batch_size):
-    self.sentences = self._fit(sentences, max_len)
+    self.sentences = sentences
     self.max_len = max_len
     self.batch_size = batch_size
-  
-  def _fit(self, sentences, max_len):
-    fitted = np.zeros([len(sentences), max_len])
-    for i in range(len(sentences)):
-      s = sentences[i]
-      l = len(s)
-      fitted[i][:l] = s
-
-    return fitted
     
   def batch_iterator(self):
     batch_size = self.batch_size
@@ -55,26 +51,21 @@ class SentenceSet:
       raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
     
     # Batching data
-    batches = np.zeros([batch_size, batch_len+1], dtype=np.int32)
-    for i in range(batch_size):
-      batch_sentences = self.sentences[n_sentences_batch*i:n_sentences_batch*(i+1)]
-      batches[i][:-1] = np.array(batch_sentences).flatten()
-
     for i in range(n_iter):
-        x = np.ones([batch_size,sentence_len])
-        y = np.ones([batch_size,sentence_len])
+      batch_sentences = self.sentences[batch_size*i:batch_size*(i+1)]
+      max_len = min(max([len(s) for s in batch_sentences]), MAX_LEN)
+      x = np.zeros([batch_size, max_len])+IPAD
+      y = np.zeros([batch_size, max_len])+IPAD
+    
+      for j in range(batch_size):
+        s = batch_sentences[j] 
+        l = min(80, len(s))
+        x[j][:l] = [IBOS]+s[:l-1]
+        y[j][:l] = s[:l]
 
-        # x prepended with <eos>
-        x[:, 1:] = batches[:, i*sentence_len:(i+1)*sentence_len-1]
-        # Naturally appending with <eos>
-        y = batches[:, i*sentence_len:(i+1)*sentence_len]
- 
-        batch_max_len = int(np.max(np.sum(np.sign(x), axis=1)))
-        
-        # We only returns 'batch_max_len' wide batch to save
-        # computational cost as well as memory
-        yield (x[:, :batch_max_len], y[:, :batch_max_len])
-
+      yield (x, y)
+  
+  
   @property
   def data(self):
     return self.sentences
@@ -95,7 +86,6 @@ class Datasets:
     self.path = path
     self.training = training
     self.word_to_id = word_to_id
-    self.eos = EOS
     self.batch_size = batch_size
     
     # Loading from files
@@ -138,7 +128,7 @@ class Datasets:
       Output: 
         * List of (sentences, max_size)
     """
-    ieos = self.word_to_id[self.eos]
+    ieos = IEOS
     sentences = []
 
     sentence = []

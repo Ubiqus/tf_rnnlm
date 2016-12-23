@@ -52,7 +52,7 @@ class Model(object):
     _mask = tf.sign(tf.to_float(_inputs))
     _seq_len = tf.reduce_sum(_mask, reduction_indices=1)
 
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_size, forget_bias=1.0, state_is_tuple=True)
+    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True)
     if is_training and keep_prob < 1:
       lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
           lstm_cell, output_keep_prob=keep_prob)
@@ -194,7 +194,7 @@ class Model(object):
   @property
   def vocab_size(self):
     # Discretly add one because 0 is used for padding
-    return self.config.vocab_size+1
+    return self.config.vocab_size+2
   
   @property
   def hidden_size(self):
