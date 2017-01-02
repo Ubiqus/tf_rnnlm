@@ -357,7 +357,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False, idict=None, sav
             (step * 1.0 / epoch_size, np.exp(costs / iters),
              iters * model.batch_size / (time.time() - start_time)))
       if saver is not None:
-        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch+1, step))
+        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch, step))
         _save_state(state) 
         config.step = step
         config.save() 
@@ -436,7 +436,7 @@ def main(_):
 
   else:
     word_to_id = None
-    config.epoch = 0
+    config.epoch = 1
     config.step = 0
 
   # Reading fast_test. 
@@ -494,20 +494,20 @@ def main(_):
           session = _restore_session(saver, session)
        
         saver = None if FLAGS.nosave else saver 
-        print("Starting training from epoch %d using %s" % (config.epoch+1, loss_fct))
+        print("Starting training from epoch %d using %s" % (config.epoch, loss_fct))
         
-        while config.epoch < config.max_max_epoch:
+        while config.epoch <= config.max_max_epoch:
           i = config.epoch
-          lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
+          lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
           m.assign_lr(session, config.learning_rate * lr_decay)
 
-          print("Epoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
+          print("Epoch: %d Learning rate: %.3f" % (i, session.run(m.lr)))
           train_perplexity = run_epoch(session, m, train_data, eval_op=m.train_op,
                                        verbose=True, saver=saver, log=FLAGS.log)
-          print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+          print("Epoch: %d Train Perplexity: %.3f" % (i, train_perplexity))
           
           valid_perplexity = run_epoch(session, mvalid, valid_data)
-          print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
+          print("Epoch: %d Valid Perplexity: %.3f" % (i, valid_perplexity))
           
           config.step = 0
           config.epoch += 1
