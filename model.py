@@ -193,7 +193,8 @@ class Model(object):
   
   @property
   def vocab_size(self):
-    # Discretly add one because 0 is used for padding
+    # vocab_size is increase by two for <eos> a <bos>
+    # since the first index 0 is used for padding
     return self.config.vocab_size+2
   
   @property

@@ -83,7 +83,7 @@ def main(_):
     We're creating a model similar to word_lm.py
     """
     size = config.hidden_size
-    vocab_size = config.vocab_size + 1 
+    vocab_size = config.vocab_size + 2
 
 
     with tf.variable_scope("Model", reuse=False, initializer=initializer):
