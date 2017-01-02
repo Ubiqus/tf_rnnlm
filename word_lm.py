@@ -215,7 +215,6 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
         }
       predictions.append(prediction)
 
-
     ppl = np.exp(costs / iters)
     wps = iters / (time.time() - start_time)
     epoch_percent = (step * 1.0 / epoch_size) * 100
@@ -224,17 +223,17 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
     
     if step>0 and step<epoch_size: 
       if verbose and step % log_step == 0:
-        print("[Epoch %d | Step: %d/%d(%.0f%%)]" % (config.epoch+1,step, epoch_size, 
+        print("[Epoch %d | Step: %d/%d(%.0f%%)]" % (config.epoch,step, epoch_size, 
                                                   epoch_percent)
           +"\tTraining Perplexity: %.3f" % ppl
           +"\tSpeed: %.0f wps" % wps)
         sys.stdout.flush()
 
       if saver is not None and step % save_step == 0:
-        print("[Epoch %d | Step: %d/%d(%.0f%%)]\t" % (config.epoch+1,step, epoch_size,
+        print("[Epoch %d | Step: %d/%d(%.0f%%)]\t" % (config.epoch,step, epoch_size,
                                                    epoch_percent),end="")
 
-        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch+1, step))
+        _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch, step))
         _save_state(state) 
         config.step = step
         config.save() 
@@ -317,7 +316,7 @@ def main(_):
 
   else:
     word_to_id = None
-    config.epoch = 0
+    config.epoch = 1
     config.step = 0
 
   # Reading fast_test. 
@@ -381,14 +380,14 @@ def main(_):
           session = _restore_session(saver, session)
        
         saver = None if FLAGS.nosave else saver 
-        print("Starting training from epoch %d using %s" % (config.epoch+1, loss_fct))
+        print("Starting training from epoch %d using %s" % (config.epoch, loss_fct))
         
-        while config.epoch < config.max_max_epoch:
+        while config.epoch <= config.max_max_epoch:
           i = config.epoch
-          lr_decay = config.lr_decay ** max(i + 1 - config.max_epoch, 0.0)
+          lr_decay = config.lr_decay ** max(i - config.max_epoch, 0.0)
           m.assign_lr(session, config.learning_rate * lr_decay)
 
-          print("\nEpoch: %d Learning rate: %.3f" % (i + 1, session.run(m.lr)))
+          print("\nEpoch: %d Learning rate: %.3f" % (i, session.run(m.lr)))
           train_perplexity = run_epoch(session, m, 
             data.train, 
             eval_op=m.train_op,
@@ -396,10 +395,10 @@ def main(_):
             saver=saver, 
             log_rate=log_rate, 
             save_rate=save_rate)
-          print("Epoch: %d Train Perplexity: %.3f" % (i + 1, train_perplexity))
+          print("Epoch: %d Train Perplexity: %.3f" % (i, train_perplexity))
           
           valid_perplexity = run_epoch(session, mvalid, data.valid)
-          print("Epoch: %d Valid Perplexity: %.3f" % (i + 1, valid_perplexity))
+          print("Epoch: %d Valid Perplexity: %.3f" % (i, valid_perplexity))
           
           config.step = 0
           config.epoch += 1
