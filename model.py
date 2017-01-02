@@ -115,7 +115,7 @@ class Model(object):
 
     loss, logits = None, None
 
-    if not fast_test:
+    if self.is_training or not (fast_test and fct == "softmax"):
       self.w = tf.get_variable("w", [vocab_size, hidden_size], dtype=self.data_type)
       self.b = tf.get_variable("b", [vocab_size], dtype=self.data_type)
       

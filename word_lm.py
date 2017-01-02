@@ -88,6 +88,9 @@ MODEL_PARAMS_FLOAT = [
       "keep_prob",
       "lr_decay"]
 
+MODEL_PARAMS_BOOL = [
+      "fast_test",
+]
 
 flags = tf.flags
 logging = tf.logging
@@ -113,7 +116,9 @@ for param in MODEL_PARAMS_INT:
   flags.DEFINE_integer(param, None, "Manually set model %s" % param)
 for param in MODEL_PARAMS_FLOAT:
   flags.DEFINE_float(param, None, "Manually set model %s" % param)
-MODEL_PARAMS = MODEL_PARAMS_INT + MODEL_PARAMS_FLOAT
+for param in MODEL_PARAMS_BOOL:
+  flags.DEFINE_bool(param, None, "Manually set model %s" % param)
+MODEL_PARAMS = MODEL_PARAMS_INT + MODEL_PARAMS_FLOAT + MODEL_PARAMS_BOOL
 
 
 
