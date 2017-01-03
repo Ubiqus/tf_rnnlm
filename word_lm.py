@@ -150,7 +150,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
 
   config = model.config
   costs = 0.0
-  iters = 0
+  iters, totiters = 0, 0
  
   last_step = config.step
   if model.is_training and last_step > 0:
@@ -200,6 +200,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
     costs += np.sum(loss)
     seq_len = vals['seq_len']
     iters += np.sum(seq_len)
+    totiters += x.shape[0]*x.shape[1]
 
     # Predict mode
     if idict is not None:
@@ -227,7 +228,8 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
         print("[Epoch %d | Step: %d/%d(%.0f%%)]" % (config.epoch,step, epoch_size, 
                                                   epoch_percent)
           +"\tTraining Perplexity: %.3f" % ppl
-          +"\tSpeed: %.0f wps" % wps)
+          +"\tSpeed: %.0f wps" % wps
+          +"\tPad Ratio: %.3f" % (1-(iters/totiters)))
         sys.stdout.flush()
 
       if saver is not None and step % save_step == 0:
