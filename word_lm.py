@@ -69,6 +69,7 @@ import sys
 from config import *
 from model import Model
 import reader
+from dataset import Datasets, SingleSentenceData
 
 ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
 LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
@@ -340,7 +341,6 @@ def main(_):
   if not linebyline:
     #raw_data = reader.raw_data(FLAGS.data_path, training=train, word_to_id=word_to_id)
     #train_data, valid_data, test_data, word_to_id = raw_dat
-    from dataset import Datasets
     data = Datasets(FLAGS.data_path, training=train, word_to_id=word_to_id, batch_size=config.batch_size)
     word_to_id = data.word_to_id
   
@@ -412,31 +412,31 @@ def main(_):
         # Line by line processing (=ppl, predict, loglikes)
         if linebyline:
           if predict: print("[")
-          while True:
-            line = sys.stdin.readline()
-            if not line: break
-            
-            idict = None
-            d = line.decode("utf-8").replace("\n", " <eos> ").split()
-            test_data = [word_to_id[word] for word in d if word in word_to_id]
           
-            if len(test_data) < 2:
+          stdinsen = SingleSentenceData(sys.stdin, word_to_id)
+          senlen = stdinsen.next()
+          while senlen is not None:
+            
+          
+            if senlen < 2:
               print(-9999)
               continue
 
             # Prediction mode
             if predict:
-              inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
-              ppl, predict = run_epoch(session, mtest, test_data, idict=inverse_dict)
-              res = {'ppl': ppl, 'predictions': predict}
-              print(json.dumps(res)+",")
+              raise ValueError("Predict Mode Unavailable for Dynamic implementation")
+              #inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
+              #ppl, predict = run_epoch(session, mtest, test_data, idict=inverse_dict)
+              #res = {'ppl': ppl, 'predictions': predict}
+              #print(json.dumps(res)+",")
             
             # ppl or loglikes
             else:
-              o = run_epoch(session, mtest, test_data, loglikes=loglikes)
+              o = run_epoch(session, mtest, stdinsen, loglikes=loglikes)
               print("%.3f" % o)
-              
-
+            
+            senlen = stdinsen.next()
+  
           if predict: print("]")
 
           # Whole text processing

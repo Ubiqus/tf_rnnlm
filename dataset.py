@@ -9,12 +9,48 @@
 import numpy as np
 
 import reader
+
 IEOS = reader.IEOS
 IBOS = reader.IBOS
 IPAD = reader.IPAD
 
 # Cut sentences after MAX_LEN words
 MAX_LEN = 80
+
+class SingleSentenceData:
+  """
+    A class meant to work on a Single Sentence.
+    i.e. reading a file `input_fd` line by line
+    
+    The point is to run a (tiny) epoch on each line
+    thus each batch contains only 1 sentence.
+    One iterate over the lines by using `next()`
+  """
+  def __init__(self, input_fd, word_to_id):
+    self.batch_size = 1  
+    self.sentence = None
+    self.word_to_id = word_to_id
+    self.input_fd = input_fd
+
+  def next(self):
+    word_to_id = self.word_to_id
+
+    line = self.input_fd.readline()
+    if not line:
+      return None
+    words = (" <bos> "+(line.decode("utf-8"))).replace("\n", " <eos> ").split()
+    self.sentence = [word_to_id[word] for word in words if word in word_to_id]
+    return len(self.sentence)
+    
+  def batch_iterator(self):
+    sen_len = len(self.sentence)
+    x = np.zeros([1, sen_len-1]) + self.sentence[:-1]
+    y = np.zeros([1, sen_len-1]) + self.sentence[1:]
+    yield (x, y)
+
+  @property
+  def data(self):
+    return self.sentence
 
 class SentenceSet:
   """
