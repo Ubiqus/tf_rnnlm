@@ -453,6 +453,8 @@ def main(_):
     print("[WARNING]: See transpose.py for more information")
    
   eval_config = Config(clone=config)
+  eval_config.batch_size = 1
+  eval_config.num_steps = 1
 
   # Load data
   if not linebyline:
