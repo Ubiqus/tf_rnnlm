@@ -109,9 +109,9 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
-flags.DEFINE_integer("save_rate", None, "How often to print information and save model (%% of epoch)")
+flags.DEFINE_integer("save_rate", None, "Number of saves per epoch (default: 'log_rate' value)")
 
-flags.DEFINE_integer("log_rate", 10, "How often to print information and save model (%% of epoch)")
+flags.DEFINE_integer("log_rate", 10, "Number of log per epoch (default: 10)")
 
 for param in MODEL_PARAMS_INT:
   flags.DEFINE_integer(param, None, "Manually set model %s" % param)
