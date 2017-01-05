@@ -406,7 +406,7 @@ def main(_):
           config.epoch += 1
           config.save()
 
-          _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch+1, 0))
+          _save_checkpoint(saver, session, "ep_%d_step_%d.ckpt" % (config.epoch, 0))
         
       else:
         session = _restore_session(saver, session)
