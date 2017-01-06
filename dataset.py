@@ -26,21 +26,23 @@ class SingleSentenceData:
     thus each batch contains only 1 sentence.
     One iterate over the lines by using `next()`
   """
-  def __init__(self, input_fd, word_to_id):
+  def __init__(self):
     self.batch_size = 1  
     self.sentence = None
-    self.word_to_id = word_to_id
-    self.input_fd = input_fd
+ 
+  
+  def set_line(self, line, word_to_id):
+    words = (" <bos> "+(line.decode("utf-8"))).replace("\n", " <eos> ").split()+['<eos>']
 
-  def next(self):
-    word_to_id = self.word_to_id
+    sentence = [word_to_id[word] for word in words if word in word_to_id]
+    self.sentence = sentence
+    return len(sentence)
 
-    line = self.input_fd.readline()
-    if not line:
-      return None
-    words = (" <bos> "+(line.decode("utf-8"))).replace("\n", " <eos> ").split()
-    self.sentence = [word_to_id[word] for word in words if word in word_to_id]
-    return len(self.sentence)
+  def read_from_file(self, input_fd, word_to_id):
+    line = input_fd.readline()
+    if  not line:
+      return None 
+    return self.set_line(line, word_to_id)
     
   def batch_iterator(self):
     sen_len = len(self.sentence)

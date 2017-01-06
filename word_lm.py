@@ -411,33 +411,22 @@ def main(_):
       else:
         session = _restore_session(saver, session)
 
-        # Line by line processing (=ppl, predict, loglikes)
-        if linebyline:
-          if predict: print("[")
+        if loglikes:
+          inputs = sys.stdin
           
-          stdinsen = SingleSentenceData(sys.stdin, word_to_id)
-          senlen = stdinsen.next()
-          while senlen is not None:
-            
-          
+          singsen = SingleSentenceData()
+          while True:
+            senlen = singsen.read_from_file(sys.stdin, word_to_id)
+            if senlen is None:
+              break
             if senlen < 2:
               print(-9999)
               continue
-
-            # Prediction mode
-            if predict:
-              raise ValueError("Predict Mode Unavailable for Dynamic implementation")
-              #inverse_dict = dict(zip(word_to_id.values(), word_to_id.keys()))
-              #ppl, predict = run_epoch(session, mtest, test_data, idict=inverse_dict)
-              #res = {'ppl': ppl, 'predictions': predict}
-              #print(json.dumps(res)+",")
             
-            # ppl or loglikes
-            else:
-              o = run_epoch(session, mtest, stdinsen, loglikes=loglikes)
-              print("%.3f" % o)
+            print(senlen)
+            o = run_epoch(session, mtest, singsen)
+            print("ppl %.3f" % o)
             
-            senlen = stdinsen.next()
   
           if predict: print("]")
 
