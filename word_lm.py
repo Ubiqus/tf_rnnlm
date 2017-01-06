@@ -71,7 +71,7 @@ from model import Model
 import reader
 from dataset import Datasets, SingleSentenceData
 
-ACTIONS = ["test", "train", "ppl", "predict", "continue", "loglikes"]
+ACTIONS = ["test", "train", "ppl", "continue", "loglikes", "generate"]
 LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
 
 MODEL_PARAMS_INT = [
@@ -112,6 +112,15 @@ flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
 flags.DEFINE_integer("save_rate", None, "Number of saves per epoch (default: 'log_rate' value)")
 
 flags.DEFINE_integer("log_rate", 10, "Number of log per epoch (default: 10)")
+
+flags.DEFINE_integer("gwords", 0, "(with --action generate) Set how many words to generate")
+
+flags.DEFINE_integer("gline", 50, "(with --action generate) Set how many lines to generate")
+
+flags.DEFINE_integer("gsteps", 35, "(with action --generate) Words to use for next word prediction")
+
+flags.DEFINE_integer("gtop", 0, "(with action --generate) Show 'gtop' highest probability words")
+
 
 for param in MODEL_PARAMS_INT:
   flags.DEFINE_integer(param, None, "Manually set model %s" % param)
@@ -313,8 +322,9 @@ def main(_):
   train = action in ["train", "continue"]
   ppl = action == "ppl"
   loglikes = action == "loglikes"
-  predict = action == "predict"
-  linebyline = ppl or loglikes or predict
+  generate = action == "generate"
+
+  linebyline = ppl or loglikes or generate
   test = action == "test"
 
   log_rate = FLAGS.log_rate
@@ -443,9 +453,50 @@ def main(_):
             print(senlen)
             o = run_epoch(session, mtest, singsen)
             print("ppl %.3f" % o)
-            
   
-          if predict: print("]")
+        elif generate:
+          nline = FLAGS.gline
+          nsteps = FLAGS.gsteps
+          top = FLAGS.gtop
+          idict = dict(zip(word_to_id.values(), word_to_id.keys()))
+          line = " "
+          state = None
+          linecount = 0
+          while linecount < nline:
+            singsen = SingleSentenceData()
+            senlen = singsen.set_line(line, word_to_id)
+            
+            o = run_epoch(session, mtest, singsen, outputs=['loss', 'logits', 'state'], state=state)
+            state = o['state']
+            probs = o['logits'][-1]
+            probs = np.exp(probs)
+            probs /= sum(probs)
+            
+            # Print words with highest probability
+            if top > 0:
+              print("")
+              ind = np.argpartition(probs, -top)[-top:]
+              ind = ind[np.argsort(probs[ind])]
+              vals= probs[ind]
+
+              for i in range(top):
+                index = ind[top-(i+1)]
+                word = idict[index]
+                prob = vals[top-(i+1)]
+                print("#%d\t%s\t%f" % (i+1, word, prob))
+
+            i = np.random.choice(range(len(probs)), p=probs)
+            nextw = idict[i]
+            
+            if nextw == "<eos>":
+              print("")
+              line = " "
+              linecount += 1
+              state = None
+            else:
+              print(nextw, end=" ")
+              sys.stdout.flush()
+              line += " %s" % nextw
 
           # Whole text processing
         elif test:
