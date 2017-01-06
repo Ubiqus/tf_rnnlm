@@ -130,15 +130,24 @@ def data_type():
 
 
 def run_epoch(session, model, data, eval_op=None, verbose=False, 
-  idict=None, saver=None, loglikes=False, log_rate=10, save_rate=50):
-  """Runs the model on the given data.
-      Returns:
-        - if idict is set (prediction mode):
-            a tuple ppl, predictions
-        - else if loglikes:
-            loglikes (-costs/log(10))
-        - else:
-            perxplexity= exp(costs/iters)
+  outputs=['ppl'], saver=None, log_rate=10, save_rate=50, state=None):
+  """Runs one epoch on the given data.
+     Inputs:
+      - session: at tensorflow session
+      - model: a model.Model object.
+      - data: a data object such as dataset.SentenceSet 
+          or dataset.SingleSentenceData
+          i.e. which has a 'batch_iterator()' function
+          which yields a tuple of (x,y), two
+          [batchsize x n] numpy arrays
+      - eval_op: a tensorflow operatiohn
+      - verbose: a boolean that set verbosity
+      - output: a list of desired outputs in 'ppl', 'll',
+          'logits', 'wps', 'loss', 'state'
+      - saver: a tf.Saver object
+      - log_rate: int, set the number of log per epoch
+      - save_rate: int, set the number of save per epoch
+      - state: set the initial state
   """
   is_pos_int = lambda x: x == int(max(0, x))
   if is_pos_int(log_rate) and is_pos_int(save_rate):
@@ -147,19 +156,17 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
   epoch_size = ((len(data.data) // model.batch_size) - 1)
   if not epoch_size > 1:
     ValueError("Epoch_size must be higher than 0. Decrease 'batch_size'") 
-
   config = model.config
   costs = 0.0
   iters, totiters = 0, 0
  
-  last_step = config.step
-  if model.is_training and last_step > 0:
+  last_step = config.step if model.is_training else 0
+  if last_step > 0:
     state = _load_state()
     print("Last step: %d" % last_step)
-  else: 
+  elif state is None:
     state = session.run(model.initial_state)
-  predictions = []
-  
+   
   start_time = time.time()
   for step, (x, y) in enumerate(data.batch_iterator()):
     if last_step > step: continue
@@ -170,7 +177,8 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
       "loss": model.loss,
       "seq_len": model.seq_len
       }
-    
+    if "logits" in outputs:
+      fetches["logits"] = model.logits
     if eval_op is not None:
       fetches["eval_op"] = eval_op
 
@@ -247,10 +255,19 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
   ppl = np.exp(costs / iters)
   ll = -costs / np.log(10)
 
-  if not idict:
-    ret = ll if loglikes else ppl  
-    return ret
-  return ppl, predictions
+  # Output dict
+  out = {}
+  if "ll" in outputs: out['ll'] = ll
+  if "ppl" in outputs: out['ppl'] = ppl
+  if "wps" in outputs: out['wps'] =  wps
+  if "loss" in outputs: out['loss']= loss
+  if "logits" in outputs: out["logits"] = vals["logits"]
+  if "state" in outputs: out['state'] = state
+  # Return directly the value if there's only one
+  if len(outputs) == 1:
+    return out[outputs[0]]
+  return out
+
 
 def _save_checkpoint(saver, session, name):
   path = os.path.join(FLAGS.model_dir, name)
