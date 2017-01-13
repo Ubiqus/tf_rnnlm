@@ -90,6 +90,9 @@ class Model(object):
     self._initial_state = _initial_state
     self.loss, self.logits = loss, logits
     self.cost = _cost
+   
+    elems = tf.range(vocab_size)
+    self.choices = tf.multinomial(logits, 1)
     
     if not is_training:
       return
