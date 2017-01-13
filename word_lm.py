@@ -109,18 +109,16 @@ flags.DEFINE_bool("use_fp16", False,
                   "Train using 16-bit floats instead of 32bit floats")
 
 flags.DEFINE_bool("nosave", False, "Set to force model not to be saved")
-flags.DEFINE_integer("save_rate", None, "Number of saves per epoch (default: 'log_rate' value)")
 
+flags.DEFINE_integer("save_rate", None, "Number of saves per epoch (default: 'log_rate' value)")
 flags.DEFINE_integer("log_rate", 10, "Number of log per epoch (default: 10)")
 
 flags.DEFINE_integer("gwords", 0, "(with --action generate) Set how many words to generate")
-
 flags.DEFINE_integer("gline", 50, "(with --action generate) Set how many lines to generate")
-
 flags.DEFINE_integer("gsteps", 35, "(with action --generate) Words to use for next word prediction")
-
 flags.DEFINE_integer("gtop", 0, "(with action --generate) Show 'gtop' highest probability words")
 
+flags.DEFINE_bool("progress", False, "Print progress info on stderr")
 
 for param in MODEL_PARAMS_INT:
   flags.DEFINE_integer(param, None, "Manually set model %s" % param)
@@ -312,6 +310,8 @@ def main(_):
   linebyline = ppl or loglikes or generate
   test = action == "test"
 
+  progress = FLAGS.progress and sys.stderr.isatty()
+
   log_rate = FLAGS.log_rate
   save_rate = FLAGS.save_rate
   if save_rate is None:
@@ -427,6 +427,8 @@ def main(_):
           inputs = sys.stdin
           
           singsen = SingleSentenceData()
+          count = 0 
+          stime = time.time()
           while True:
             senlen = singsen.read_from_file(sys.stdin, word_to_id)
             if senlen is None:
@@ -435,9 +437,13 @@ def main(_):
               print(-9999)
               continue
             
-            print(senlen)
             o = run_epoch(session, mtest, singsen)
-            print("ppl %.3f" % o)
+            count +=1
+            if progress:
+              etime = time.time() - stime
+              llps = count / etime
+              print("\rLoglikes per secs: %f" % llps, end="", file=sys.stderr)
+            print("%f" % o)
   
         elif generate:
           nline = FLAGS.gline
