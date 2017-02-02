@@ -91,8 +91,9 @@ class Model(object):
     self.loss, self.logits = loss, logits
     self.cost = _cost
    
-    elems = tf.range(vocab_size)
-    self.choices = tf.multinomial(logits, 1)
+    if logits is not None:
+      elems = tf.range(vocab_size)
+      self.choices = tf.multinomial(logits, 1)
     
     if not is_training:
       return

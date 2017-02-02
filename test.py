@@ -16,7 +16,7 @@ class Test(RnnlmOp):
 
   def _load_data(self):
     w2id = self.io.w2id
-    self.data = Datasets(self.data_path, training=False, word_to_id=w2id, batch_size=self.config.batch_size)
+    self.data = Datasets(self.data_path, training=False, word_to_id=w2id, batch_size=1)
 
   def _build_graph(self):
     config = self.config

@@ -29,7 +29,7 @@ flags.DEFINE_bool("continue", False, "Continue training where it stopped")
 flags.DEFINE_string("model_dir", "model", "model_dir (containing ckpt files and word_to_id)")
 flags.DEFINE_string(
     "config", None,
-    "A type of model. Possible options are: 'small', 'medium', 'large' or path to config file.")
+    "A type of model. Possible options are: 'small', 'medium', 'large'")
 flags.DEFINE_string("data_path", None,
                     "Where the training/test data is stored.")
 flags.DEFINE_string("loss", "softmax", 

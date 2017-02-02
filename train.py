@@ -82,6 +82,8 @@ class Train(RnnlmOp):
         config.epoch += 1
         config.save()
 
+        self.io.save_checkpoint(session, "ep_%d.ckpt" % config.epoch)
+
 if __name__ == "__main__":
   import flags
   train = Train(flags.config, flags.FLAGS) 
