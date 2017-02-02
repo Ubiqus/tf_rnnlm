@@ -23,7 +23,7 @@ class Train(RnnlmOp):
     self._build_graph()
 
   def _load_data(self):
-    self.data = Datasets(self.data_path, training=True, word_to_id=None, batch_size=self.config.batch_size)
+    self.data = Datasets(self.data_path, training=True, word_to_id=None, batch_size=self.config.batch_size, num_steps=self.config.num_steps)
     self.io.save_w2id(self.data.word_to_id)
         
   def _build_graph(self):

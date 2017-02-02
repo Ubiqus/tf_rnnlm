@@ -34,6 +34,7 @@ class Model(object):
     self.loss_fct = loss_fct
     self.is_training = is_training
     self.use_fp16=use_fp16
+
     
     self._build_model()
 
@@ -49,9 +50,7 @@ class Model(object):
     _inputs = tf.placeholder(tf.int32, [batch_size, None], "inputs")
     _targets = tf.placeholder(tf.int32, [batch_size, None], "targets")
     
-    _mask = tf.sign(tf.to_float(_inputs))
-    _seq_len = tf.reduce_sum(_mask, reduction_indices=1)
-
+    
     lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True)
     if is_training and keep_prob < 1:
       lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
@@ -67,14 +66,20 @@ class Model(object):
 
     if is_training and keep_prob < 1:
       inputs = tf.nn.dropout(inputs, keep_prob)
+   
+    # if num_steps == 0 we are in 'sentence mode' aka. dynamic
+    if self.config.num_steps == 0:
+      _mask = tf.sign(tf.to_float(_inputs))
+    else:
+      _mask = tf.ones([self.batch_size, self.config.num_steps])
+    _seq_len = tf.reduce_sum(_mask, reduction_indices=1)
 
     _outputs, state = tf.nn.dynamic_rnn(cell=cell, inputs=inputs,
         initial_state=_initial_state,
         sequence_length=_seq_len)
 
-    _output = tf.reshape(tf.concat(1, _outputs), [-1, hidden_size])
-
     _mask = tf.reshape(_mask, [-1])
+    _output = tf.reshape(tf.concat(1, _outputs), [-1, hidden_size])
 
     self.inputs = _inputs
     self.targets= _targets

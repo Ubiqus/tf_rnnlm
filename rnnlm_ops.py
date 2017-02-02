@@ -1,5 +1,5 @@
 from __future__ import division, print_function
-from util import SpeedCounter
+from util import SpeedCounter, mkdirs
 import tensorflow as tf
 from dataset import Datasets, SingleSentenceData
 import model
@@ -34,7 +34,7 @@ def run_epoch(session, model, data, eval_op=None, verbose=False,
   if is_pos_int(log_rate) and is_pos_int(save_rate):
     ValueError("log_rate and save_rate must be positive integer")
 
-  epoch_size = ((len(data.data) // model.batch_size) - 1)
+  epoch_size = data.epoch_size
   if not epoch_size > 1:
     ValueError("Epoch_size must be higher than 0. Decrease 'batch_size'")
   config = model.config
@@ -144,6 +144,7 @@ class OpIO:
     self.params = params
     self.word_to_id, self.id_to_word = None, None
     self._saver = None
+    mkdirs(params.model_dir)
   
   def check_dir(self, path):
     if path is None:
@@ -223,8 +224,7 @@ class OpIO:
     return self._saver
 
 class RnnlmOp(object):
-  MODELS = {#"dynamic": model.DynamicRnnLM,
-            "default": model.Model}
+  MODELS = {"default": model.Model}
   
   
   def param_default(self, param, val):

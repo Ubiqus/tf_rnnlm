@@ -11,6 +11,7 @@ MODEL_PARAMS_INT = [
       "max_max_epoch",
       "batch_size", 
       "vocab_size",
+      "num_steps",
       "num_samples"]
 MODEL_PARAMS_FLOAT = [
       "init_scale",
