@@ -169,29 +169,34 @@ class Model(object):
     
     if fct == "softmax":
       logits = tf.matmul(self.output, self.w_t)+self.b
-      loss = tf.nn.seq2seq.sequence_loss_by_example(
+      loss = _sequence_loss_by_example(
           [logits],
           [tf.reshape(self.targets, [-1])],
           [self.mask])
     
     elif fct == "sampledsoftmax":
       def _loss_fct(inputs_, labels_):
-        labels_ = tf.reshape(labels_, [-1, 1])
         return tf.nn.sampled_softmax_loss(
             self.w, self.b, inputs_, labels_, self.num_samples, vocab_size)
     
-      loss = tf.nn.seq2seq.sequence_loss_by_example(
+      loss = _sequence_loss_by_example(
             [self.output],
             [tf.reshape(self.targets, [-1,1])],
             [self.mask],
             softmax_loss_function=_loss_fct)
     
     elif fct == "nce":
-      loss = tf.nn.nce_loss(self.w, self.b,                           
-                            self.output,
-                            tf.reshape(self.targets, [-1,1]),
+      def _loss_fct(labels, inputs):
+        labels = tf.reshape(labels, [-1, 1]) 
+        return tf.nn.nce_loss(self.w, 
+                            self.b,                           
+                            tf.cast(labels, tf.float32),
+                            tf.cast(inputs, tf.float32),
                             self.num_samples, 
-                            self.vocab_size)
+                            self.vocab_size,
+                            partition_strategy="div")
+      loss = _loss_fct(self.targets, self.output)
+    
     else:
       raise ValueError("Unsupported loss function: %s" % fct) 
     return loss, logits
