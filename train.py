@@ -39,13 +39,13 @@ class Train(RnnlmOp):
     with tf.name_scope("Train"):
         with tf.variable_scope("Model", reuse=False, initializer=initializer):
           self.train_model = self.Model(config=config, is_training=True, loss_fct=self.loss_fct)
-        tf.scalar_summary("Training Loss", self.train_model.cost)
-        tf.scalar_summary("Learning Rate", self.train_model.lr)
+        tf.summary.scalar("Training Loss", self.train_model.cost)
+        tf.summary.scalar("Learning Rate", self.train_model.lr)
     
         with tf.name_scope("Valid"):
           with tf.variable_scope("Model", reuse=True, initializer=initializer):
-            self.validation_model = self.Model(config=config, is_training=False)
-          tf.scalar_summary("Validation Loss", self.validation_model.cost)
+            self.validation_model = self.Model(config=config, is_training=False, loss_fct="softmax")
+          tf.summary.scalar("Validation Loss", self.validation_model.cost)
     
     with tf.name_scope("Test"):
       with tf.variable_scope("Model", reuse=True, initializer=initializer):

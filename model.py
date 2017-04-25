@@ -51,12 +51,34 @@ class Model(object):
     _targets = tf.placeholder(tf.int32, [batch_size, None], "targets")
     
     
-    lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(hidden_size, forget_bias=0.0, state_is_tuple=True)
-    if is_training and keep_prob < 1:
-      lstm_cell = tf.nn.rnn_cell.DropoutWrapper(
-          lstm_cell, output_keep_prob=keep_prob)
-    cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * num_layers, state_is_tuple=True)
+    lstm_creator = lambda: tf.contrib.rnn.BasicLSTMCell(
+                                        hidden_size, 
+                                        forget_bias=0.0, state_is_tuple=True,
+                                        reuse=True)
+    import inspect
+    def lstm_cell():
+      # With the latest TensorFlow source code (as of Mar 27, 2017),
+      # the BasicLSTMCell will need a reuse parameter which is unfortunately not
+      # defined in TensorFlow 1.0. To maintain backwards compatibility, we add
+      # an argument check here:
+      size = hidden_size
+      if 'reuse' in inspect.getargspec(
+          tf.contrib.rnn.BasicLSTMCell.__init__).args:
+        return tf.contrib.rnn.BasicLSTMCell(
+            size, forget_bias=0.0, state_is_tuple=True,
+            reuse=tf.get_variable_scope().reuse)
+      else:
+        return tf.contrib.rnn.BasicLSTMCell(
+            size, forget_bias=0.0, state_is_tuple=True)
 
+    lstm_creator = lstm_cell
+    if is_training and keep_prob < 1:
+      cell_creator = lambda:tf.contrib.rnn.DropoutWrapper(
+          lstm_creator(), output_keep_prob=keep_prob)
+    else:
+      cell_creator = lstm_creator
+
+    cell = tf.contrib.rnn.MultiRNNCell([cell_creator() for _ in range(num_layers)], state_is_tuple=True)
     _initial_state = cell.zero_state(batch_size, data_type)
     
     with tf.device("/cpu:0"):
@@ -74,12 +96,16 @@ class Model(object):
       _mask = tf.ones([self.batch_size, self.config.num_steps])
     _seq_len = tf.reduce_sum(_mask, reduction_indices=1)
 
+    # outputs is [bs x ts x hidden_size] (ts may be None)
     _outputs, state = tf.nn.dynamic_rnn(cell=cell, inputs=inputs,
         initial_state=_initial_state,
         sequence_length=_seq_len)
 
     _mask = tf.reshape(_mask, [-1])
-    _output = tf.reshape(tf.concat(1, _outputs), [-1, hidden_size])
+   
+    # output: [bs*ts x hidden_size]
+    _output = tf.reshape(_outputs, [-1, hidden_size])
+
 
     self.inputs = _inputs
     self.targets= _targets
@@ -121,6 +147,9 @@ class Model(object):
     fast_test = self.fast_test
     vocab_size = self.vocab_size
     hidden_size = self.hidden_size
+    
+    # TF 1.1
+    _sequence_loss_by_example = tf.contrib.legacy_seq2seq.sequence_loss_by_example
 
     loss, logits = None, None
 
