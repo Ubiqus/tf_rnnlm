@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from rnnlm_ops import RnnlmOp, run_epoch
 from dataset import Datasets
 from config import Config
@@ -23,7 +23,11 @@ class Train(RnnlmOp):
     self._build_graph()
 
   def _load_data(self):
-    self.data = Datasets(self.data_path, training=True, word_to_id=None, batch_size=self.config.batch_size, num_steps=self.config.num_steps)
+    self.data = Datasets(self.data_path, 
+                        training=True, 
+                        word_to_id=None, 
+                        batch_size=self.config.batch_size,
+                        num_steps=self.config.num_steps)
     self.io.save_w2id(self.data.word_to_id)
         
   def _build_graph(self):
@@ -52,13 +56,12 @@ class Train(RnnlmOp):
     config = self.config
     data = self.data
     params = self.params
-    loss_fct = self.loss_fct
         
     init_op = tf.initialize_all_variables()
     with tf.Session() as session:
       session.run(init_op)
 
-      print("Starting training from epoch %d using %s" % (config.epoch, loss_fct))
+      print("Starting training from epoch %d using %s loss" % (config.epoch, m.loss_fct))
           
       while config.epoch <= config.max_max_epoch:
         i = config.epoch
@@ -75,6 +78,7 @@ class Train(RnnlmOp):
           save_rate=params.save_rate)
         print("Epoch: %d Train Perplexity: %.3f" % (i, train_perplexity))
 
+        print("Validation using %s loss" % mvalid.loss_fct)
         valid_perplexity = run_epoch(session, mvalid, data.valid)
         print("Epoch: %d Valid Perplexity: %.3f" % (i, valid_perplexity))
 

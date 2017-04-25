@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import print_function, division
 from rnnlm_ops import RnnlmOp, run_epoch
 from dataset import SingleSentenceData

@@ -181,7 +181,7 @@ class OpIO:
     if w2id is not None:
       self.word_to_id = w2id
     
-    with open(self.w2id_path, 'w') as f:
+    with open(self.w2id_path, 'wb') as f:
         pickle.dump(self.w2id, f)
  
   def load_state(self,):

@@ -65,7 +65,7 @@ class SentenceSet:
     each element is a sentence
   """
   def __init__(self, raw, batch_size):
-    self.sentences = _raw_to_sentences(raw)
+    self.sentences = self._raw_to_sentences(raw)
     self.batch_size = batch_size
   
   def _raw_to_sentences(self, raw_data):
@@ -135,7 +135,7 @@ class SentenceSet:
 
 class SequenceSet:
   """
-    Fixed sized (num_steps) sub-datasets
+    Set of fixed size sequences (num_steps)
   """
   def __init__(self, raw_data, batch_size, num_steps):
     self.raw_data = np.array(raw_data, dtype=np.int32)
@@ -147,9 +147,7 @@ class SequenceSet:
     self.epoch_size = (batch_len - 1) // num_steps
 
   def batch_iterator(self):
-    """Iterate on the raw PTB data.
-    This generates batch_size pointers into the raw PTB data, and allows
-    minibatch iteration along these pointers.
+    """Iterate on the raw data.
     Args:
       raw_data: one of the raw data outputs from ptb_raw_data.
       batch_size: int, the batch size.

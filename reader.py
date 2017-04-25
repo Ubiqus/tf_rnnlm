@@ -45,12 +45,11 @@ IPAD=0
 
 def _read_words(filename):
   with tf.gfile.GFile(filename, "r") as f:
-    return f.read().decode("utf-8").replace("\n"," %s " % EOS).split()
+    return f.read().replace("\n"," %s " % EOS).split()
 
 
 def _build_vocab(filename):
   data = _read_words(filename)
-
   counter = collections.Counter(data)
   count_pairs = sorted(counter.items(), key=lambda x: (-x[1], x[0]))
 
@@ -97,7 +96,9 @@ def raw_data(data_path=None, training=True, word_to_id=None):
       word_to_id = _build_vocab(train_path)
     train_data = _file_to_word_ids(train_path, word_to_id)
     valid_data = _file_to_word_ids(valid_path, word_to_id)
-    test_data = _file_to_word_ids(test_path, word_to_id)
+    
+    if os.path.isfile(test_path):
+      test_data = _file_to_word_ids(test_path, word_to_id)
   
   else:
     if not word_to_id:

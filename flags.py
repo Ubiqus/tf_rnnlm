@@ -3,25 +3,7 @@ import os
 
 LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
 
-MODEL_PARAMS_INT = [
-      "max_grad_norm"
-      "num_layers",
-      "hidden_size",
-      "max_epoch",
-      "max_max_epoch",
-      "batch_size", 
-      "vocab_size",
-      "num_steps",
-      "num_samples"]
-MODEL_PARAMS_FLOAT = [
-      "init_scale",
-      "learning_rate",
-      "keep_prob",
-      "lr_decay"]
 
-MODEL_PARAMS_BOOL = [
-      "fast_test",
-]
 
 flags = tf.flags
 logging = tf.logging
@@ -47,6 +29,25 @@ flags.DEFINE_integer("gline", 50, "(with --action generate) Set how many lines t
 
 flags.DEFINE_bool("progress", False, "Print progress info on stderr")
 
+MODEL_PARAMS_INT = [
+      "max_grad_norm"
+      "num_layers",
+      "hidden_size",
+      "max_epoch",
+      "max_max_epoch",
+      "batch_size", 
+      "vocab_size",
+      "num_steps",
+      "num_samples"]
+MODEL_PARAMS_FLOAT = [
+      "init_scale",
+      "learning_rate",
+      "keep_prob",
+      "lr_decay"]
+
+MODEL_PARAMS_BOOL = [
+      "fast_test",
+]
 for param in MODEL_PARAMS_INT:
   flags.DEFINE_integer(param, None, "Manually set model %s" % param)
 for param in MODEL_PARAMS_FLOAT:

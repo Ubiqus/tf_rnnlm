@@ -24,11 +24,11 @@ class Config:
     self.__dict__.update(entries)
 
   def _get_config(self, config):       
-    if config in ["small", "smsm", "smlg"]:
+    if config in ["small", "sm", "smsm", "smlg"]:
       o = small_config()
     elif config == "medium":
       o = medium_config()
-    elif config in ["large", "lgsm", "lglg"]:
+    elif config in ["large", "lg", "lgsm", "lglg"]:
       o = large_config()
     else:
       raise ValueError("Invalid config: %s", config)
