@@ -226,7 +226,7 @@ class Datasets:
     print("Loading train set")
     self.train = self._load_set(train_path)
     print("Loading valid set")
-    self.valid = self._load_set(valid_path, batch_size=1)
+    self.valid = self._load_set(valid_path)
     print("Loading test  set")
     self.test  = self._load_set(test_path, batch_size=1)
 
