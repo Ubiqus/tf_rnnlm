@@ -7,15 +7,24 @@
 
 """
 import numpy as np
-
+import os
 import reader
+import tensorflow as tf
+from collections import Counter
 
-IEOS = reader.IEOS
-IBOS = reader.IBOS
-IPAD = reader.IPAD
+# Don't change those values. I would have serious side effects on the model. 
+EOS = "<eos>"
+IEOS=2
+
+BOS = "<bos>"
+IBOS=1
+
+PAD = "<pad>"
+IPAD=0
+
 
 # Cut sentences after MAX_LEN words
-MAX_LEN = 80
+MAX_LEN = 100
 
 class SingleSentenceData:
   """
@@ -72,7 +81,6 @@ class SentenceSet:
     """ 
       Inputs:
         * raw_data: list of word indentifier.  [ int ]. 
-        * eos: end of string identifier, int
       Output: 
         * sentences
     """
@@ -105,13 +113,17 @@ class SentenceSet:
     # n_iter aka. 'epoch_size'
     n_iter = n_sentences_batch
 
+    self.sentences.sort(key=len)
+    shuffled_order = np.arange(n_iter)
+    np.random.shuffle(shuffled_order)
 
     if n_iter == 0:
       raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
     
     # Batching data
     for i in range(n_iter):
-      batch_sentences = self.sentences[batch_size*i:batch_size*(i+1)]
+      ii = shuffled_order[i]
+      batch_sentences = self.sentences[batch_size*ii:batch_size*(ii+1)]
       max_len = min(max([len(s) for s in batch_sentences]), MAX_LEN)
       x = np.zeros([batch_size, max_len])+IPAD
       y = np.zeros([batch_size, max_len])+IPAD
@@ -196,30 +208,70 @@ class Datasets:
     # Setting parameters
     self.path = path
     self.training = training
-    self.word_to_id = word_to_id
     self.batch_size = batch_size
+    self.num_steps = num_steps
     
     # Loading from files
-    raw_dataset, self.word_to_id = self._read_from_path()
-    self.raw_dataset = raw_dataset 
+    train_path = os.path.join(path, "train.txt")
+    valid_path = os.path.join(path, "valid.txt")
+    test_path = os.path.join(path, "test.txt")
     
-
-    # Creating sub-sets
-    if num_steps == 0:
-      # Dynamic mode = sentence level
-      self.train, self.valid, self.test = [ 
-                SentenceSet(_raw, self.batch_size)
-                  if _raw is not None else None
-                  for _raw in raw_dataset]
+    print("Building vocab")
+    if word_to_id is None:
+      self._build_vocab(train_path)
     else:
-      train, valid, test = raw_dataset
-      self.train = SequenceSet(train, batch_size, num_steps)
-      self.valid = SequenceSet(valid, batch_size, num_steps)
-      self.test = SequenceSet(test, 1, num_steps)
-  def _read_from_path(self):
-    """Read file(s) in directory 'self.path' converting word to integer
-    """
-    return reader.raw_data(data_path=self.path, training=self.training, word_to_id=self.word_to_id) 
+      self.word_to_id = word_to_id
+    print("Vocab done")
+
+    print("Loading train set")
+    self.train = self._load_set(train_path)
+    print("Loading valid set")
+    self.valid = self._load_set(valid_path, batch_size=1)
+    print("Loading test  set")
+    self.test  = self._load_set(test_path, batch_size=1)
+
+  def _load_set(self, path, batch_size=None):
+    if not os.path.isfile(path):
+      return None
+    
+    if batch_size is None:
+      batch_size = self.batch_size
+
+    data = self._file_to_word_ids(path)
+
+    if self.num_steps == 0:
+      return SentenceSet(data, batch_size)
+    else:
+      return SequenceSet(data, batch_size, self.num_steps)
+   
+  def _build_vocab(self, filename):
+    counts = Counter()
+    with tf.gfile.GFile(filename, "r") as f:
+      #for line in f:
+      #  words = line.replace("\n"," ").split()
+      #  counts += Counter(words)
+      while True:
+        chunk = f.read(int(500000000/2))
+        if not chunk: 
+          break
+        counts += Counter(chunk.replace("\n", " ").split())
+
+    sorted_pairs = sorted(counts.items(), key=lambda x: (-x[1], x[0]))
+    self.word_to_id = {e[0]: (i+3) for (i, e) in enumerate(sorted_pairs)}
+    self.word_to_id[EOS] = IEOS
+    self.word_to_id[BOS] = IBOS
+    self.word_to_id[PAD] = IPAD
+
+
+  def _file_to_word_ids(self, filename):
+    d = []
+    w2id = self.word_to_id
+    with tf.gfile.GFile(filename, "r") as f:
+      for line in f:
+        ids = [w2id[w] for w in line.replace("\n"," %s " % EOS).split() if w in w2id]
+        d += ids
+
+    return d
  
   def train_data(self):
     return self.train.data

@@ -173,7 +173,7 @@ class OpIO:
       raise ValueError("No checkpoint file found")
 
   def load_w2id(self):
-    with open(self.w2id_path, 'r') as f:
+    with open(self.w2id_path, 'rb') as f:
       self.word_to_id = pickle.load(f)
     return self.word_to_id
 
@@ -185,11 +185,11 @@ class OpIO:
         pickle.dump(self.w2id, f)
  
   def load_state(self,):
-    with open(self.state_path, 'r') as f:
+    with open(self.state_path, 'rb') as f:
       return pickle.load(f)
 
   def save_state(self, state):
-    with open(self.state_path, 'w') as f:
+    with open(self.state_path, 'wb') as f:
       pickle.dump(state, f)
 
   @property
