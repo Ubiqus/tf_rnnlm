@@ -20,7 +20,7 @@ class Train(RnnlmOp):
       self.config.epoch, self.config.step = 1,0 
 
     self._load_data()
-    self._build_graph()
+    self.build_graph()
 
   def _load_data(self):
     self.data = Datasets(self.data_path, 

@@ -12,7 +12,7 @@ class Test(RnnlmOp):
     self.data_path = params.data_path
     
     self._load_data()
-    self._build_graph()
+    self.build_graph()
 
   def _load_data(self):
     w2id = self.io.w2id

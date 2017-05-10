@@ -10,7 +10,7 @@ import tensorflow as tf
 class Loglikes(RnnlmOp):
   def __init__(self, config, params):
     super(Loglikes, self).__init__(config, params)
-    self._build_graph()
+    self.build_graph()
 
   def _build_graph(self):
     config = self.config

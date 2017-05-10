@@ -10,7 +10,7 @@ import sys
 class Generate(RnnlmOp):
   def __init__(self, config, params, model="default"):
     super(Generate, self).__init__(config, params)
-    self._build_graph()
+    self.build_graph()
 
   def _build_graph(self):
     config = self.config

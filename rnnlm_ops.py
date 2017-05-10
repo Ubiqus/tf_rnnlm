@@ -255,3 +255,13 @@ class RnnlmOp(object):
 
   def _run(self):
     raise ValueError("Nothing to do")
+
+  def build_graph(self):
+    t0 = time.time()
+    print("Building graph")
+    self._build_graph()
+    t1 = time.time()
+    print("Graph built in %.3fsec" % (t1 -t0))
+
+  def _build_graph(self):
+    raise ValueError("Nothing to do")
