@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 from __future__ import print_function, division
 from rnnlm_ops import RnnlmOp, run_epoch
 from dataset import Datasets
@@ -16,13 +16,16 @@ class Test(RnnlmOp):
 
   def _load_data(self):
     w2id = self.io.w2id
-    self.data = Datasets(self.data_path, training=False, word_to_id=w2id, batch_size=1)
+    self.data = Datasets(self.data_path, 
+                        training=False, 
+                        word_to_id=w2id, 
+                        batch_size=1,
+                        num_steps=self.config.num_steps)
 
   def _build_graph(self):
     config = self.config
     eval_config = Config(clone=config)
     eval_config.batch_size = 1
-
     initializer = self.model_initializer
     with tf.name_scope("Test"):
       with tf.variable_scope("Model", reuse=False, initializer=initializer):

@@ -237,11 +237,13 @@ class Datasets:
       self.word_to_id = word_to_id
     print("Vocabulary size: %d" % len(self.word_to_id))
 
-    print("Loading train set")
-    self.train = self._load_set(train_path)
+    if training:
+      print("Loading train set")
+      self.train = self._load_set(train_path)
     
-    print("Loading valid set")
-    self.valid = self._load_set(valid_path)
+      print("Loading valid set")
+      self.valid = self._load_set(valid_path)
+    
     print("Loading test  set")
     self.test  = self._load_set(test_path, batch_size=1)
 
