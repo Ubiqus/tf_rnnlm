@@ -244,6 +244,8 @@ class RnnlmOp(object):
     self.config = config
     self.model_initializer = tf.random_uniform_initializer(-config.init_scale, 
                                                             config.init_scale)
+    print(self.config)
+
   def Model(self, *args, **kwargs):
     model_class = RnnlmOp.MODELS[self.model]
     return model_class(*args, **kwargs)

@@ -47,6 +47,9 @@ class Config:
     json.dump(o, open(tmp, 'w'), indent=2)
     self.path = tmp
 
+  def __str__(self):
+    o = self.__dict__
+    return json.dumps(o, indent=2)
 
 def small_config():
   """Small config."""
