@@ -8,7 +8,6 @@
 """
 import numpy as np
 import os
-import reader
 import tensorflow as tf
 from collections import Counter
 
