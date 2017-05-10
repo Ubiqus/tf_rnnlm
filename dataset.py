@@ -72,10 +72,32 @@ class SentenceSet:
     i.e. train, valid & text sets
     each element is a sentence
   """
-  def __init__(self, raw, batch_size):
+  def __init__(self, raw, batch_size, shuffle=True):
     self.sentences = self._raw_to_sentences(raw)
     self.batch_size = batch_size
-  
+    self.shuffle = shuffle 
+    # nb sentence in data
+    self.n_sentences = len(self.data)
+
+    # n_iter aka. 'epoch_size'
+    self.n_iter = self.n_sentences // self.batch_size
+
+    self.sentences.sort(key=len)
+    self.order = np.arange(self.n_iter)
+
+    print(self)
+    
+  def __str__(self):
+    return ("SentenceSet:\n"  
+           + "\n\t* #sentences: %d" % self.n_sentences
+           + "\n\t* batch_size: %d" % self.batch_size
+           + "\n\t* #iter: %d" % self.n_iter
+           + "\n\t* shuffled: %s" % str(self.shuffle))
+
+  def maybe_shuffle(self):
+    if self.shuffle:
+      np.random.shuffle(self.order)
+
   def _raw_to_sentences(self, raw_data):
     """ 
       Inputs:
@@ -96,32 +118,16 @@ class SentenceSet:
 
     return sentences
 
- 
   def batch_iterator(self):
-    batch_size = self.batch_size
-
-    # nb batch we want aka. batch_size
-    n_batch = self.batch_size
-
-    # nb sentence in data
-    n_sentences = len(self.data)
-
-    # nb sentences per batch
-    n_sentences_batch = n_sentences // n_batch
-
-    # n_iter aka. 'epoch_size'
-    n_iter = n_sentences_batch
-
-    self.sentences.sort(key=len)
-    shuffled_order = np.arange(n_iter)
-    np.random.shuffle(shuffled_order)
-
+    n_iter, batch_size = self.n_iter, self.batch_size
     if n_iter == 0:
-      raise ValueError("epoch_size == 0, decrease batch_size or num_steps")
-    
+      raise ValueError("epoch_size == 0, decrease batch_size")
+   
+    self.maybe_shuffle()
+
     # Batching data
     for i in range(n_iter):
-      ii = shuffled_order[i]
+      ii = self.order[i]
       batch_sentences = self.sentences[batch_size*ii:batch_size*(ii+1)]
       max_len = min(max([len(s) for s in batch_sentences]), MAX_LEN)
       x = np.zeros([batch_size, max_len])+IPAD
@@ -156,7 +162,16 @@ class SequenceSet:
     self.data_len = data_len = len(raw_data)
     self.batch_len = batch_len = data_len // batch_size
     self.epoch_size = (batch_len - 1) // num_steps
+    
+    print(self)
 
+  def __str__(self):
+    return ("SequenceSet:"
+            + "\n\t* #sequences: %d" % self.data_len
+            + "\n\t* batch_size: %d" % self.batch_size
+            + "\n\t* batch_len: %d" % self.batch_len
+            + "\n\t* #iter: %d" % self.epoch_size)
+  
   def batch_iterator(self):
     """Iterate on the raw data.
     Args:
@@ -215,15 +230,16 @@ class Datasets:
     valid_path = os.path.join(path, "valid.txt")
     test_path = os.path.join(path, "test.txt")
     
-    print("Building vocab")
     if word_to_id is None:
+      print("Building vocabulary...")
       self._build_vocab(train_path)
     else:
       self.word_to_id = word_to_id
-    print("Vocab done")
+    print("Vocabulary size: %d" % len(self.word_to_id))
 
     print("Loading train set")
     self.train = self._load_set(train_path)
+    
     print("Loading valid set")
     self.valid = self._load_set(valid_path)
     print("Loading test  set")
@@ -231,6 +247,7 @@ class Datasets:
 
   def _load_set(self, path, batch_size=None):
     if not os.path.isfile(path):
+      print("WARNING: File not found: '%s'" % path)
       return None
     
     if batch_size is None:
