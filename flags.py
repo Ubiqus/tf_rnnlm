@@ -30,7 +30,7 @@ flags.DEFINE_integer("gline", 50, "(with --action generate) Set how many lines t
 flags.DEFINE_bool("progress", False, "Print progress info on stderr")
 
 MODEL_PARAMS_INT = [
-      "max_grad_norm"
+      "max_grad_norm",
       "num_layers",
       "hidden_size",
       "max_epoch",
