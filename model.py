@@ -35,7 +35,10 @@ class Model(object):
     self.is_training = is_training
     self.use_fp16=use_fp16
 
-    
+    self.embed_dim = config.hidden_size
+    if hasattr(config, 'embed_dim'):
+      self.embed_dim = config.embed_dim
+
     self._build_model()
 
   def _build_model(self):
@@ -46,11 +49,23 @@ class Model(object):
     keep_prob = self.keep_prob
     is_training = self.is_training
     data_type = self.data_type
+    embed_dim = self.embed_dim
 
     _inputs = tf.placeholder(tf.int32, [batch_size, None], "inputs")
     _targets = tf.placeholder(tf.int32, [batch_size, None], "targets")
     
-    
+    # Embedding data
+    with tf.device("/cpu:0"):
+      embedding = tf.get_variable(
+          "embedding", [vocab_size, embed_dim], dtype=data_type)
+      inputs = tf.nn.embedding_lookup(embedding, _inputs)
+
+    # Droupout
+    if is_training and keep_prob < 1:
+      inputs = tf.nn.dropout(inputs, keep_prob)
+
+
+    # Creating the cells
     lstm_creator = lambda: tf.contrib.rnn.BasicLSTMCell(
                                         hidden_size, 
                                         forget_bias=0.0, state_is_tuple=True,
@@ -81,14 +96,7 @@ class Model(object):
     cell = tf.contrib.rnn.MultiRNNCell([cell_creator() for _ in range(num_layers)], state_is_tuple=True)
     _initial_state = cell.zero_state(batch_size, data_type)
     
-    with tf.device("/cpu:0"):
-      embedding = tf.get_variable(
-          "embedding", [vocab_size, hidden_size], dtype=data_type)
-      inputs = tf.nn.embedding_lookup(embedding, _inputs)
-
-    if is_training and keep_prob < 1:
-      inputs = tf.nn.dropout(inputs, keep_prob)
-   
+       
     # if num_steps == 0 we are in 'sentence mode' aka. dynamic
     if self.config.num_steps == 0:
       _mask = tf.sign(tf.to_float(_inputs))

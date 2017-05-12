@@ -38,7 +38,8 @@ MODEL_PARAMS_INT = [
       "batch_size", 
       "vocab_size",
       "num_steps",
-      "num_samples"]
+      "num_samples",
+      "embed_dim"]
 MODEL_PARAMS_FLOAT = [
       "init_scale",
       "learning_rate",
