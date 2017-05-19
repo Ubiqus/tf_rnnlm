@@ -66,10 +66,6 @@ class Model(object):
 
 
     # Creating the cells
-    lstm_creator = lambda: tf.contrib.rnn.BasicLSTMCell(
-                                        hidden_size, 
-                                        forget_bias=0.0, state_is_tuple=True,
-                                        reuse=True)
     import inspect
     def lstm_cell():
       # With the latest TensorFlow source code (as of Mar 27, 2017),
@@ -85,13 +81,27 @@ class Model(object):
       else:
         return tf.contrib.rnn.BasicLSTMCell(
             size, forget_bias=0.0, state_is_tuple=True)
+      
+    def gru_cell():
+      size = hidden_size
+      if 'reuse' in inspect.getargspec(
+          tf.contrib.rnn.GRUCell.__init__).args:
+        return tf.contrib.rnn.BasicLSTMCell(
+            size, reuse=tf.get_variable_scope().reuse)
+      else:
+        return tf.contrib.rnn.GRUCell(
+            size)
 
-    lstm_creator = lstm_cell
+    if self.config.cell == 'gru':
+      _cell_creator = gru_cell
+    else:
+      _cell_creator = lstm_cell
+
     if is_training and keep_prob < 1:
       cell_creator = lambda:tf.contrib.rnn.DropoutWrapper(
-          lstm_creator(), output_keep_prob=keep_prob)
+          _cell_creator(), output_keep_prob=keep_prob)
     else:
-      cell_creator = lstm_creator
+      cell_creator = _cell_creator
 
     cell = tf.contrib.rnn.MultiRNNCell([cell_creator() for _ in range(num_layers)], state_is_tuple=True)
     _initial_state = cell.zero_state(batch_size, data_type)

@@ -1,9 +1,8 @@
 import tensorflow as tf
 import os
+from config import Config
 
 LOSS_FCTS = ["softmax", "nce", "sampledsoftmax"]
-
-
 
 flags = tf.flags
 logging = tf.logging
@@ -28,7 +27,7 @@ flags.DEFINE_integer("log_rate", 10, "Number of log per epoch (default: 10)")
 flags.DEFINE_integer("gline", 50, "(with --action generate) Set how many lines to generate")
 
 flags.DEFINE_bool("progress", False, "Print progress info on stderr")
-
+flags.DEFINE_string("cell", "lstm", "Choose between LSTM (default) and GRU")
 MODEL_PARAMS_INT = [
       "max_grad_norm",
       "num_layers",
@@ -59,10 +58,14 @@ MODEL_PARAMS = MODEL_PARAMS_INT + MODEL_PARAMS_FLOAT + MODEL_PARAMS_BOOL
 
 FLAGS = flags.FLAGS
 
-from config import Config
+if FLAGS.cell.lower() not in ["gru", "lstm"]:
+  raise ValueError("Unknow cell type: %s" % FLAGS.cell)
+
 def get_config():
   params = {key: FLAGS.__getattr__(key) for key in MODEL_PARAMS} 
+  params['cell'] = FLAGS.cell
   config_path = os.path.join(FLAGS.model_dir, "config")
+  print("Config path :%s" % config_path)
   return Config(config=FLAGS.config, path=config_path, params=params) 
 
 config = get_config()
