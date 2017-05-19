@@ -1,18 +1,24 @@
 import json
+import os
 
 class Config:
   """Configuration object loaded from/saved to JSON object
   """
   def __init__(self, config=None, path=None, params=[], clone=None):
-
+    self.path = path
+    save = True
     if clone is not None:
       self.path = clone.path
       entries = clone.__dict__	
     elif config is not None:
-      self.path = path
       entries = self._get_config(config)
+      if os.path.isfile(self.path):
+        print("A configuration file is already existing. It will not be overwritten")
+      else:
+        print("Writing configuration file: '%s'" % self.path)
+        save = True
+
     elif path is not None:
-      self.path = path
       entries = self._load()
     else:
       raise ValueError("Parameters 'config' and 'path' can't be both 'None'")
@@ -22,6 +28,9 @@ class Config:
       if val is not None:
         entries[param] = val
     self.__dict__.update(entries)
+
+    if save:
+      self.save()
 
   def _get_config(self, config):       
     if config in ["small", "sm", "smsm", "smlg"]:
