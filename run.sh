@@ -35,7 +35,7 @@ train(){
   log="--log_rate $LOG_RATE"
   output="./$conf/train.output"
   
-  cmd="{ time unbuffer python word_lm.py --action train $model_dir $data_path $config $loss $batch_size $num_samples $log ;} 2>&1 | tee $output "
+  cmd="{ time unbuffer ./train.py $model_dir $data_path $config $loss $batch_size $num_samples $log ;} 2>&1 | tee $output "
   echo "$cmd"
 }
 
@@ -52,7 +52,7 @@ test_transposed(){
   data_path="--data_path $DATA_PATH"
   output="./$conf/test.output"
   
-  cmd="{ time python word_lm.py --action test $model_dir $data_path ;} 2>&1 | tee $output "
+  cmd="{ time ./test.py $model_dir $data_path ;} 2>&1 | tee $output "
   echo "$cmd"
 }
 
