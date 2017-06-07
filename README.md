@@ -4,11 +4,9 @@
 * [Original Work](#orig)
 * [Motivations](#motivations)
 * [Quickstart](#quickstart)
-* [Continue Training (--action continue)](#continue)
-* [Getting a text perplexity with regard to the LM (--action test)](#test)
-* [Line by line perplexity (--action ppl)](#ppl)
-* [Line by line loglikes (--action loglikes)](#loglikes)
-* [Line by line prediction (--action predict)](#predict)
+* [Continue Training](#continue)
+* [Getting a text perplexity with regard to the LM](#test)
+* [Line by line loglikes](#loglikes)
 * [Results](#results)
 
 
@@ -79,7 +77,7 @@ Yes, that's all. It will train `small`, `medium` and `large` then generate a rep
 ## [Continue Training](#continue)
 One can continue an interrupted training with the following command:
 ```shell
-./train.py --action continue --data_path=./simple-examples/data --model_dir=./model
+./train.py --data_path=./simple-examples/data --model_dir=./model
 ```
 Where `./model` must contain `config`, `word_to_id`, `checkpoint` and the corresponding `.cktp` files.
 
