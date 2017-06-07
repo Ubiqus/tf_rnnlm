@@ -12,7 +12,7 @@
 * [Results](#results)
 
 
-================
+---
 
 ## [Original Work](#orig)
 
@@ -37,10 +37,8 @@ The tutorial uses the PTB dataset ([tgz](http://www.fit.vutbr.cz/~imikolov/rnnlm
 ```shell
 git clone https://github.com/pltrdy/tf_rnnlm
 cd tf_rnnlm
-python word_lm.py --help
+./train.py --help
 ```
-
-**Note** that `word_lm.py` imports `reader.py` not `tensorflow.models.rnn.ptb` (i.e. it does not use your tensorflow installation). It is therefore compatible with tensorflow r0.11c as long as you don't use `word_lm.py` alone. 
 
 **Downloading PTB dataset:**
 ```shell
@@ -51,7 +49,7 @@ chmod +x tools/get_ptb.sh
 **Training small model:**
 ```shell
 mkdir small_model
-python word_lm.py --action train --data_path ./simple-examples/data --model_dir=./small_model --config small
+./train.py --data_path ./simple-examples/data --model_dir=./small_model --config small
 ```
 **Training custom model:**
 ```shell
@@ -67,7 +65,7 @@ vi custom_model/config
 # Train it. (it will automatically look for 'config' file in the model directory as no --config is set).
 # It will look for 'train.txt', 'test.txt' and 'valid.txt' in --data_path
 # These files must be present.
-python word_lm.py --action train --data_path=./simple-examples/data --model_dir=./custom_model
+./train.py --data_path=./simple-examples/data --model_dir=./custom_model
 ```
 **note:** data files are expected to be called `train.txt`, `test.txt` and `valid.txt`. Note that `get_ptb.sh` creates symlinks for that purpose
 
@@ -78,47 +76,30 @@ python word_lm.py --action train --data_path=./simple-examples/data --model_dir=
 Yes, that's all. It will train `small`, `medium` and `large` then generate a report like [this](results/template.md) using [report.sh](../tools/report.sh).   
 **Feel free to share the report with us!**
 
-## [Continue Training (--action continue)](#continue)
+## [Continue Training](#continue)
 One can continue an interrupted training with the following command:
 ```shell
-python word_lm.py --action continue --data_path=./simple-examples/data --model_dir=./model
+./train.py --action continue --data_path=./simple-examples/data --model_dir=./model
 ```
 Where `./model` must contain `config`, `word_to_id`, `checkpoint` and the corresponding `.cktp` files.
 
-## [Getting a text perplexity with regard to the LM (--action test)](#test)
+## [Getting a text perplexity with regard to the LM](#test)
 ```shell
 # Compute and outputs the perplexity of ./simple-examples/data/test.txt using LM in ./model
-python word_lm.py --action test --data_path=./simple-examples/data --model_dir=./model
+./test.py --data_path=./simple-examples/data --model_dir=./model
 ```
 
-## [Line by line perplexity (--action ppl)](#ppl)
-Running the model on each `stdin` line and returning its perplexity (precisely 'per-word perplexity' i.e. `exp(costs/iters)`
-```shell
-cat ./data/test.txt | python word_lm.py --action ppl --model_dir=./model
-```
-
-
-## [Line by line loglikes (--action loglikes)](#loglikes)
+## [Line by line loglikes](#loglikes)
 Running the model on each `stdin` line and returning its 'loglikes' (i.e. `-costs/log(10)`).
 
 **Note:** in particular, it is meant to be used for Kaldi's rescoring.
 ```shell
-cat ./data/test.txt | python word_lm.py --action loglikes --model_dir=./model
+cat ./data/test.txt | ./loglikes.py --model_dir=./model
 ```
 
-## [Line by line prediction (--action predict)](#predict)
-Running the model on each `stdin` line and prints a prediction informations
-```shell
-cat ./data/test.txt | python word_lm.py --action ppl --model_dir=./model
-```
-It will print a json object with the following structure:
-+ ppl: perplexity (float)
-+ predictions: (array, for each word of the line)
-  + word: current word, 
-  + target: next word, 
-  + prob: probability associated with the target, 
-  + pred_word: predicted word
-  + pred_prob: probability associated with the predicted word
+## [Text generation](#generate)
+Not documented yet
+ 
 
 ## [Results](#results)
 Configuration `small` `medium` and `large` are defined in `config.py` and are the same as in [tensorflow.models.rnn.ptb.ptb_word_lm.py:200](https://github.com/tensorflow/tensorflow/blob/e2d51a87f0727f8537b46048d8241aeebb6e48d6/tensorflow/models/rnn/ptb/ptb_word_lm.py#L200)
