@@ -3,7 +3,7 @@
 # Dec. 2016 - pltrdy
 # Train&Test small, medium and large model
 # and generate a report 
-
+set -e
 DATA_PATH="./data"
 LOSS='sampledsoftmax'
 LOG_RATE=3
