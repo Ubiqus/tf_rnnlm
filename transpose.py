@@ -75,7 +75,6 @@ def main(_):
   config.batch_size = 1
   config.num_step = 1
   config.path = os.path.join(FLAGS.dst, "config")
-  config.fast_test = True
   
   initializer = tf.random_uniform_initializer(-config.init_scale,
                                                 config.init_scale)
@@ -121,6 +120,7 @@ def main(_):
         shutil.copyfile(w2i_src_path, w2i_dst_path)
         
         # Saving config to dst dir
+        config.fast_test = True
         config.save() 
 
 if __name__ == "__main__":
