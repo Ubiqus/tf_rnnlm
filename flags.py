@@ -68,6 +68,8 @@ def get_config():
   print("Config path :%s" % config_path)
   return Config(config=FLAGS.config, path=config_path, params=params) 
 
+if not os.path.exists(FLAGS.model_dir):
+  os.mkdir(FLAGS.model_dir)
 config = get_config()
 FLAGS.continue_training = FLAGS.__getattr__('continue')
 FLAGS.loss_fct = FLAGS.loss

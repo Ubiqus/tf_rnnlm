@@ -40,7 +40,7 @@ class SingleSentenceData:
  
   
   def set_line(self, line, word_to_id):
-    words = (" <bos> "+(line.decode("utf-8"))).replace("\n", " <eos> ").split()+['<eos>']
+    words = (" <bos> "+line).replace("\n", " <eos> ").split()+['<eos>']
 
     sentence = [word_to_id[word] for word in words if word in word_to_id]
     self.sentence = sentence
