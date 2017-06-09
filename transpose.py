@@ -1,4 +1,4 @@
-#!/usr/bin/env python
+#!/usr/bin/env python3
 
 """
   29 nov, 2016 - pltrdy
@@ -33,6 +33,7 @@ import tensorflow as tf
 from config import *
 import os
 import util 
+from model import Model
 
 flags = tf.flags
 
@@ -84,36 +85,18 @@ def main(_):
     """
     size = config.hidden_size
     vocab_size = config.vocab_size + 2
-
+    config.fast_test = False
 
     with tf.variable_scope("Model", reuse=False, initializer=initializer):
-      # Inputs won't actually be used, we just set ummy values
-      dummyinput = tf.ones([config.batch_size, config.num_steps], dtype=tf.int32)
+      m = Model(config=config, is_training=False)
 
-      lstm_cell = tf.nn.rnn_cell.BasicLSTMCell(size, forget_bias=1.0, state_is_tuple=True)
-      
-      cell = tf.nn.rnn_cell.MultiRNNCell([lstm_cell] * config.num_layers, state_is_tuple=True)
-      _initial_state = cell.zero_state(config.batch_size, data_type())
-
-      with tf.device("/cpu:0"):
-        embedding = tf.get_variable(
-            "embedding", [vocab_size, size], dtype=data_type())
-
-        inputs = tf.nn.embedding_lookup(embedding, dummyinput)
-
-      inputs = [tf.squeeze(input_, [1])
-           for input_ in tf.split(1, config.num_steps, inputs)]
-      outputs, state = tf.nn.rnn(cell=cell, inputs=inputs, initial_state=cell.zero_state(config.batch_size, data_type()))
-
-      b = tf.get_variable("b", [vocab_size], dtype=data_type())
-      w = tf.get_variable("w", [vocab_size, size], dtype=data_type())
-      w_t = tf.Variable(tf.transpose(w), name="w_t")
+      m.w_t = tf.Variable(tf.transpose(m.w), name="w_t")
 
       
       with tf.Session() as session:
         # Loading everything (but w_t) from file
-        v = tf.all_variables() 
-        v.remove(w_t)
+        v = tf.global_variables() 
+        v.remove(m.w_t)
       
         print("loading %s"%str(v))
         saver = tf.train.Saver(v)
@@ -121,14 +104,14 @@ def main(_):
         
         # Only init w_t. Otherwise the model will be
         # corrupted with input
-        init_op = tf.initialize_variables([ w_t ])
+        init_op = tf.initialize_variables([m.w_t])
         session.run(init_op)
 
 	
         # Saving everything except w
-        v.remove(w) 
-	v.append(w_t)
-	print("saving %s"%str(v))  
+        v.remove(m.w) 
+        v.append(m.w_t)
+        print("saving %s"%str(v))  
         saver = tf.train.Saver(v)
         _save_checkpoint(saver, session, "wt2w.ckpt")
         
