@@ -73,11 +73,11 @@ reportconf(){
   printf "\n## $conf\n"
   if [ -d $1 ]; then
     readconf "$1"
-    train=$(tail $conf/train.output | grep "Train" | awk '{print $NF}')
-    valid=$(tail $conf/train.output | grep "Valid" | awk '{print $NF}')
+    train=$(tail $conf/train.output | grep "Train" | tail -n 1 | awk '{print $NF}')
+    valid=$(tail $conf/train.output | grep "Valid" | tail -n 1 | awk '{print $NF}')
     real=$(tail $conf/train.output | grep "real" | awk '{print $NF}')
     tst=$(tail $conf/test.output | grep "Test" | awk '{print $NF}')  
-    wps=$(cat $conf/train.output | grep "wps" | awk '{print $(NF-1)}')
+    wps=$(cat $conf/train.output | grep "wps" | awk '{print $(NF-4)}')
     meanwps=$(mean "$wps")
 
     #list "Training PPL" "$train"
