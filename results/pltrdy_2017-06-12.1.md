@@ -1,0 +1,85 @@
+## About
+ * **User**: [pltrdy](https://github.com/pltrdy)
+ * **Date**: 2017-06-12
+ * **Commit**: [Update report (2) 4d9140f](https://github.com/pltrdy/tf_rnnlm/commit/4d9140fa047bcedd3fc0af289164ed2692cfb1c4)
+ * **Dataset**: PTB dataset
+ * **Hardware**: n/a
+
+## small
+
+```json
+{
+  "keep_prob": 1.0,
+  "batch_size": 64,
+  "learning_rate": 1.0,
+  "step": 0,
+  "max_epoch": 4,
+  "init_scale": 0.1,
+  "hidden_size": 200,
+  "max_max_epoch": 13,
+  "max_grad_norm": 5,
+  "fast_test": false,
+  "num_steps": 20,
+  "epoch": 14,
+  "num_layers": 2,
+  "vocab_size": 10000,
+  "cell": "lstm",
+  "lr_decay": 0.5,
+  "num_samples": 1024
+}
+```
+
+## medium
+
+```json
+{
+  "epoch": 40,
+  "max_grad_norm": 5,
+  "init_scale": 0.05,
+  "keep_prob": 0.5,
+  "batch_size": 64,
+  "num_steps": 35,
+  "learning_rate": 1.0,
+  "num_samples": 1024,
+  "hidden_size": 650,
+  "lr_decay": 0.8,
+  "step": 0,
+  "cell": "lstm",
+  "max_max_epoch": 39,
+  "num_layers": 2,
+  "vocab_size": 10000,
+  "fast_test": false,
+  "max_epoch": 6
+}
+```
+
+## large
+
+```json
+{
+  "batch_size": 64,
+  "num_steps": 35,
+  "num_layers": 2,
+  "num_samples": 1024,
+  "init_scale": 0.04,
+  "keep_prob": 0.35,
+  "lr_decay": 0.8695652173913044,
+  "vocab_size": 10000,
+  "fast_test": false,
+  "step": 0,
+  "max_grad_norm": 10,
+  "learning_rate": 1.0,
+  "max_epoch": 14,
+  "hidden_size": 1500,
+  "max_max_epoch": 55,
+  "epoch": 56,
+  "cell": "lstm"
+}
+```
+
+## Results
+|config|train|valid|test|wps|time|
+|---|---|---|---|---|---|
+|small|32.202|119.802|115.209|44871|4m40.937s|
+|medium|31.591|97.219|93.450|24943|25m0.533s|
+|large|18.198|88.675|83.143|9157|95m25.899s|
