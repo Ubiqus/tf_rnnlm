@@ -4,10 +4,12 @@
 # Train&Test small, medium and large model
 # and generate a report 
 set -e
+action="$1"
+
 DATA_PATH="./data"
 LOSS='sampledsoftmax'
 LOG_RATE=3
-BATCH_SIZE=64
+BATCH_SIZE=32
 NUM_SAMPLES=1024
 
 if ! [ -d "$DATA_PATH" ]; then
@@ -34,8 +36,14 @@ train(){
   num_samples="--num_samples $NUM_SAMPLES"
   log="--log_rate $LOG_RATE"
   output="./$conf/train.output"
-  
-  cmd="{ time unbuffer ./train.py $model_dir $data_path $config $loss $batch_size $num_samples $log ;} 2>&1 | tee $output "
+ 
+  if [ "$action" = "dynamic" ]; then
+    num_steps="--num_steps 0"
+  else
+    num_steps=""
+  fi
+
+  cmd="{ time unbuffer ./train.py $model_dir $data_path $config $loss $num_steps $batch_size $num_samples $log ;} 2>&1 | tee $output "
   echo "$cmd"
 }
 

@@ -7,7 +7,7 @@
 * [Continue Training](#continue)
 * [Getting a text perplexity with regard to the LM](#test)
 * [Line by line loglikes](#loglikes)
-* [Results](#results)
+* [Results on PTB Dataset](#ptb_results)
 
 
 ---
@@ -99,28 +99,33 @@ cat ./data/test.txt | ./loglikes.py --model_dir=./model
 Not documented yet
  
 
-## [Results](#results)
+## [Results on PTB dataset](#ptb_results)
 Configuration `small` `medium` and `large` are defined in `config.py` and are the same as in [tensorflow.models.rnn.ptb.ptb_word_lm.py:200](https://github.com/tensorflow/tensorflow/blob/e2d51a87f0727f8537b46048d8241aeebb6e48d6/tensorflow/models/rnn/ptb/ptb_word_lm.py#L200)
-### Baseline
-Quoting [tensorflow.models.rnn.ptb.ptb_word_lm.py:22](https://github.com/tensorflow/tensorflow/blob/e2d51a87f0727f8537b46048d8241aeebb6e48d6/tensorflow/models/rnn/ptb/ptb_word_lm.py#L22):
-> There are 3 supported model configurations:
-> 
-> | config | epochs | train | valid  | test  |
-> |--------|--------|-------|--------|-------|
-> | small  | 13     | 37.99 | 121.39 | 115.91|
-> | medium | 39     | 48.45 |  86.16 |  82.07|
-> | large  | 55     | 37.87 |  82.62 |  78.29|
-> The exact results may vary depending on the random initialization.
-
-### Our RNN LM working on sentences (see [docs/dynamic.md](docs/dynamic.md))
-(based on commit [fff...f5d6](https://github.com/pltrdy/tf_rnnlm/commit/fff44942340b1881f1ebbb3be72044da41b8f5d6), training using `sampledsoftmax` loss function, `num_samples=1024` and `batch_size=64`; 1x GPU GTX1080)
 
 
-| config | epochs | train | valid  | test  |  speed   | training_time | testing time |
-|--------|--------|-------|--------|-------|----------|---------------|--------------|
-| small  | 13     | 29.06 | 96.84  | 94.13 | ~36kWPS  |    6m21s      |     27s      |
-| medium | 39     | 24.61 |  75.35 | 72.83 | ~11kWPS  |    59m7s      |     28s      |
-| large  | 55     | 15.23 |  72.8  | 69.80 |  ~4kWPS  |    224m23s    |     1m5s     |
+### Using `batch_size=32`
+| config | train | valid  | test  |  speed   | training_time |
+|--------|-------|--------|-------|----------|---------------|
+| small  | 24.608| 118.848|113.366| ~49kWPS  |    4m17s      |
+| medium | 26.068| 91.305 |87.152 | ~25kWPS  |    24m50s     |
+| large  | 18.245| 84.603 |79.515 |  ~6kWPS  |    135m15s    |
+|        |       |        |       |          |               |
+| small  | 27.913|123.896 |119.496| ~42kWPS  |    4m56s      |
+| medium | 28.533|98.105  |94.576 | ~23kWPS  |    26m51s     |
+| large  | 21.635| 91.916 | 87.110|  ~6kWPS  |    140m675    |
+
+
+### Using `batch_size=64`
+| config | train | valid  | test  |  speed   | training_time |
+|--------|-------|--------|-------|----------|---------------|
+| small  | 32.202| 119.802|115.209| ~44kWPS  |    4m40s      |   
+| medium | 31.591|  97.219| 93.450| ~24kWPS  |    25m0s      |   
+| large  | 18.198|  88.675| 83.143|  ~9kWPS  |     95m25s    |   
+|        |       |        |       |          |               |
+| small  | 39.031| 127.949|124.292| ~94kWPS  |    3m9s       |   
+| medium | 33.130| 102.652|99.381 | ~29kWPS  |    21m7s      |   
+| large  | 21.122| 95.310 |90.658 |  ~7kWPS  |    112m48s    | 
+
 
 **kWPS:** processing speed, i.e. thousands word per seconds.    
 **Reported time** are `real` times (see [What do 'real', 'user' and 'sys' mean in the output of time(1)?](http://stackoverflow.com/a/556411/5903959)   
