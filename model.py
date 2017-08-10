@@ -193,9 +193,14 @@ class Model(object):
           [self.mask])
     
     elif fct == "sampledsoftmax":
-      def _loss_fct(inputs_, labels_):
+      def _loss_fct(labels, logits):
         return tf.nn.sampled_softmax_loss(
-            self.w, self.b, inputs_, labels_, self.num_samples, vocab_size)
+                            self.w,
+                            self.b,
+                            tf.cast(labels, tf.float32),
+                            tf.cast(logits,tf.float32),
+                            self.num_samples,
+                            vocab_size)
     
       loss = _sequence_loss_by_example(
             [self.output],
@@ -204,12 +209,12 @@ class Model(object):
             softmax_loss_function=_loss_fct)
     
     elif fct == "nce":
-      def _loss_fct(labels, inputs):
+      def _loss_fct(labels, logits):
         labels = tf.reshape(labels, [-1, 1]) 
         return tf.nn.nce_loss(self.w, 
                             self.b,                           
                             tf.cast(labels, tf.float32),
-                            tf.cast(inputs, tf.float32),
+                            tf.cast(logits, tf.float32),
                             self.num_samples, 
                             self.vocab_size,
                             partition_strategy="div")
